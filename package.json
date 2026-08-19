@@ -1,0 +1,66 @@
+{
+  "name": "@ohcnetwork/care-filly-character",
+  "version": "0.1.0",
+  "description": "Filly — the CARE mascot as a real-time 3D web character (three.js + react-three-fiber). Idle, blink, listening, talking, happy, thinking, surprised, sleepy.",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./filly-mascot.glb": "./dist/filly-mascot.glb"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "vite --config vite.playground.config.ts",
+    "preview": "vite preview --config vite.playground.config.ts",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "build:playground": "vite build --config vite.playground.config.ts",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "lint": "eslint src playground scripts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "snapshot": "tsx scripts/snapshot.mts",
+    "export:glb": "tsx scripts/export-glb.mts"
+  },
+  "peerDependencies": {
+    "@react-three/fiber": ">=9.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0",
+    "three": ">=0.179.0"
+  },
+  "dependencies": {
+    "three-bvh-csg": "^0.0.18",
+    "three-mesh-bvh": "^0.9.14"
+  },
+  "devDependencies": {
+    "@react-three/fiber": "^9.7.0",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.2",
+    "@types/three": "^0.185.4",
+    "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^9.30.0",
+    "playwright": "1.61.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "three": "^0.185.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.67.0",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4",
+    "vite-plugin-dts": "^4.5.4"
+  },
+  "engines": {
+    "node": ">=22.9.0"
+  }
+}
