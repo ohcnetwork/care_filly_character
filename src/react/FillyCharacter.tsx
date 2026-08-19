@@ -16,8 +16,8 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { FillyAnimator } from "@/animation/FillyAnimator";
-import type { FillyState } from "@/core/types";
+import { FillyAnimator } from "../animation/FillyAnimator";
+import type { FillyState } from "../core/types";
 import { useOnScreen, usePointerFollow } from "./hooks";
 import { CAMERA_FOV, CAMERA_POSITION, FillyScene, type FillyFreeze } from "./FillyScene";
 
@@ -95,13 +95,15 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
 
-  // One animator per seed. Its initial state is whatever the first render asked
-  // for; in freeze mode it is rebuilt per state so `reset()` lands on that state.
+  // One animator per seed. It starts in the state current at creation time (so
+  // a runtime `seed` change doesn't replay an enter impulse from the mount
+  // state); in freeze mode it is rebuilt per state so `reset()` lands on it.
   const frozen = freezeAt !== undefined;
-  const initialStateRef = useRef(state);
+  const latestStateRef = useRef(state);
+  latestStateRef.current = state;
   const frozenState = frozen ? state : null;
   const animator = useMemo(
-    () => new FillyAnimator({ seed, initialState: frozenState ?? initialStateRef.current }),
+    () => new FillyAnimator({ seed, initialState: frozenState ?? latestStateRef.current }),
     [seed, frozenState],
   );
 
@@ -130,6 +132,11 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
   usePointerFollow(wrapperRef, animator, followPointer && !frozen);
   const onScreen = useOnScreen(wrapperRef);
   const running = !paused && onScreen && !frozen;
+  // While paused/offscreen/frozen the Canvas runs in "demand" mode (not
+  // "never"): r3f ignores invalidate() in "never" mode, so a character paused
+  // from its first render — or resized while paused — would stay blank. In
+  // "demand" the first frame and resize re-renders still happen; the animator
+  // is simply not advanced (see FillyScene's useFrame).
 
   useImperativeHandle(
     ref,
@@ -213,8 +220,10 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
         gl={{ alpha: true, antialias: true, powerPreference: "low-power" }}
         dpr={dpr}
         camera={{ fov: CAMERA_FOV, position: [...CAMERA_POSITION], near: 0.1, far: 50 }}
-        frameloop={frozen ? "demand" : running ? "always" : "never"}
-        style={{ width: "100%", height: "100%", background }}
+        frameloop={frozen || !running ? "demand" : "always"}
+        // r3f's own wrapper div sets `pointer-events: auto`, which would undo the
+        // `none` on our wrapper when not interactive; mirror it here.
+        style={{ width: "100%", height: "100%", background, pointerEvents: interactive ? "auto" : "none" }}
       >
         <FillyScene animator={animator} running={running} freeze={freeze} onReady={handleReady} />
       </Canvas>

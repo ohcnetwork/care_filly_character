@@ -51,7 +51,7 @@ export interface MouthShape {
 }
 
 /** Base half-width at wide = 1 (world units). */
-export const MOUTH_BASE_HALF_WIDTH = 0.1;
+export const MOUTH_BASE_HALF_WIDTH = 0.092;
 /** Below this `open` the mouth is a closed lip line. */
 export const MOUTH_CLOSED_THRESHOLD = 0.04;
 
@@ -154,7 +154,8 @@ export function computeMouthShape(params: MouthParams, out: MouthShape = createM
   out.lineWidth = closed ? 0.018 : 0.012;
 
   // Tongue: sits in the bottom of the open smile, hidden for round "o".
-  const tongueAlpha = smoothstep(0.15, 0.4, open) * (1 - round);
+  // Round "o" mouths keep a hint of tongue (the sheet's surprised face has one).
+  const tongueAlpha = smoothstep(0.15, 0.4, open) * (1 - 0.6 * round);
   const tongueRy = out.height * 0.42;
   out.tongue.x = 0;
   out.tongue.y = bY + tongueRy * 0.55;

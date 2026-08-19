@@ -25,22 +25,22 @@ export const EAR_ANCHOR = {
   bury: 0.11,
 } as const;
 /** Side tiles: big rounded squares centred at (±0.74, +0.08), abutting the bar ends. */
-export const SIDE_ANCHOR = { x: 0.74, y: 0.08, z: 0.67, depthOffset: -0.05, face: 0.8 } as const;
+export const SIDE_ANCHOR = { x: 0.75, y: 0.14, z: 0.65, depthOffset: -0.05, face: 0.8 } as const;
 /** Arms hang low on the sides (hand centre ≈ (±0.88, −0.47)). */
-export const SHOULDER = { x: 0.8, y: -0.3, z: 0.25 } as const;
+export const SHOULDER = { x: 0.8, y: -0.24, z: 0.25 } as const;
 export const HAND_REST = { x: 0.08, y: -0.17, z: 0.02 } as const;
 /** Hand-to-chin world position for the viewer's-left arm (THINKING): just left of the mouth. */
-export const HAND_CHIN = { x: -0.36, y: -0.3, z: 0.9 } as const;
-export const HAND_SCALE = { x: 0.19, y: 0.23, z: 0.18 } as const;
-export const FOOT = { x: 0.43, y: -0.86, z: 0.5, sx: 0.22, sy: 0.14, sz: 0.2 } as const;
+export const HAND_CHIN = { x: -0.42, y: -0.38, z: 0.88 } as const;
+export const HAND_SCALE = { x: 0.18, y: 0.215, z: 0.17 } as const;
+export const FOOT = { x: 0.41, y: -0.84, z: 0.5, sx: 0.19, sy: 0.16, sz: 0.22 } as const;
 /**
  * Ear perk: + tips the tile upright/forward (about local x) with a little
  * outward swing (about local z); − lies it back (droop) with a touch of
  * inward swing so the two ears never collide.
  */
 export const EAR_TILT_X = 0.85;
-export const EAR_SWING_OUT = 0.3;
-export const EAR_SWING_IN = 0.2;
+export const EAR_SWING_OUT = 0.15;
+export const EAR_SWING_IN = 0.25;
 
 // ── scratch objects ──────────────────────────────────────────────────────────
 
@@ -113,10 +113,14 @@ export function buildEar(side: -1 | 1, materials: FillyMaterials): EarRig {
   return { group, tile, base, side };
 }
 
-/** Rotate an ear about its base: + perk (upright + outward), − droop. Allocation-free. */
+/**
+ * Rotate an ear about its base: + perk (tips forward/upright), − droop (lies
+ * back). Both lean slightly OUTWARD so the ears never collide and a sleepy
+ * droop reads as "softening", not as folding onto the head. Allocation-free.
+ */
 export function applyEarPose(ear: EarRig, angle: number): void {
   _qx.setFromAxisAngle(X_AXIS, angle * EAR_TILT_X);
-  _qz.setFromAxisAngle(Z_AXIS, -ear.side * angle * (angle > 0 ? EAR_SWING_OUT : EAR_SWING_IN));
+  _qz.setFromAxisAngle(Z_AXIS, -ear.side * Math.abs(angle) * (angle > 0 ? EAR_SWING_OUT : EAR_SWING_IN));
   ear.group.quaternion.copy(ear.base).multiply(_qx).multiply(_qz);
 }
 

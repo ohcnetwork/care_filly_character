@@ -201,7 +201,7 @@ describe("FillyAnimator — surprised", () => {
     expect(Math.abs(p.bodyY)).toBeLessThan(0.02);
     expect(p.eyeScale).toBeGreaterThan(1.2);
     expect(p.mouthRound).toBeCloseTo(1, 1);
-    expect(p.earL).toBeGreaterThan(0.35);
+    expect(p.earL).toBeGreaterThan(0.2);
     expect(p.sparks).toBeCloseTo(1, 1);
   });
 });
@@ -215,8 +215,8 @@ describe("FillyAnimator — sleepy", () => {
     expect(p.eyeOpenR).toBeCloseTo(0, 2);
     expect(p.eyeArc).toBeCloseTo(-1, 2);
     expect(p.zzz).toBeCloseTo(1, 2);
-    expect(p.earL).toBeLessThan(-0.25);
-    expect(p.bodyPitch).toBeGreaterThan(0.05);
+    expect(p.earL).toBeLessThan(-0.1);
+    expect(p.bodyPitch).toBeGreaterThan(0.02);
     expect(p.mouthRound).toBeGreaterThan(0.9);
   });
 

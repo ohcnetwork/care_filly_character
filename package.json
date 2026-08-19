@@ -1,7 +1,7 @@
 {
   "name": "@ohcnetwork/care-filly-character",
   "version": "0.1.0",
-  "description": "Filly \u2014 the CARE mascot as a real-time 3D web character (three.js + react-three-fiber). Idle, blink, listening, talking, happy, thinking, surprised, sleepy.",
+  "description": "Filly — the CARE mascot as a real-time 3D web character (three.js + react-three-fiber). Idle, blink, listening, talking, happy, thinking, surprised, sleepy.",
   "type": "module",
   "license": "MIT",
   "sideEffects": false,
@@ -33,7 +33,8 @@
     "clean": "rm -rf dist dist-playground",
     "build:all": "npm run clean && npm run build && npm run export:glb",
     "prepublishOnly": "npm run build:all",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "build:demo": "npm run build:playground && tsx scripts/singlefile.mts"
   },
   "peerDependencies": {
     "@react-three/fiber": ">=9.0.0",

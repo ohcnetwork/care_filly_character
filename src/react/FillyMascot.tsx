@@ -3,7 +3,7 @@
  * the plugin's `FillyStatus` (+ `speaking`) instead of a raw `FillyState`.
  */
 import { forwardRef, useMemo } from "react";
-import { mapStatusToState, type FillyStatus } from "@/animation/mapStatus";
+import { mapStatusToState, type FillyStatus } from "../animation/mapStatus";
 import { FillyCharacter, type FillyCharacterHandle, type FillyCharacterProps } from "./FillyCharacter";
 
 export interface FillyMascotProps extends Omit<FillyCharacterProps, "state"> {

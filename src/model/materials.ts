@@ -3,7 +3,7 @@
  * the look can be tuned in one place (src/core/palette.ts).
  */
 import * as THREE from "three";
-import { MATERIALS, PALETTE } from "@/core/palette";
+import { MATERIALS, PALETTE } from "../core/palette";
 
 /** Materials used by {@link FillyModel}. All are owned by whoever built them. */
 export interface FillyMaterials {
@@ -85,11 +85,11 @@ export function buildFillyMaterials(): FillyMaterials {
   const cheek = new THREE.MeshStandardMaterial({
     color: PALETTE.cheek,
     emissive: PALETTE.cheek,
-    emissiveIntensity: 0.55,
+    emissiveIntensity: 0.8,
     roughness: MATERIALS.cheek.roughness,
     metalness: 0,
     transparent: true,
-    opacity: 0.7,
+    opacity: 0.9,
     depthWrite: false,
     name: "filly-cheek",
   });

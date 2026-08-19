@@ -224,9 +224,9 @@ export function getRoundedBoxGeometry(
  * Ear tile dimensions (width, height, depth, corner radius). Wide upright
  * slabs that sit flush against the plus stem (inner edge ≈ ±0.18, outer ≈ ±0.64).
  */
-export const EAR_TILE = { w: 0.46, h: 0.6, d: 0.3, r: 0.13 } as const;
+export const EAR_TILE = { w: 0.48, h: 0.64, d: 0.3, r: 0.17 } as const;
 /** Side tile dimensions — large rounded squares butting the bar ends. */
-export const SIDE_TILE = { w: 0.38, h: 0.46, d: 0.3, r: 0.13 } as const;
+export const SIDE_TILE = { w: 0.42, h: 0.52, d: 0.3, r: 0.16 } as const;
 
 export function getEarTileGeometry(): RoundedBoxGeometry {
   return getRoundedBoxGeometry(EAR_TILE.w, EAR_TILE.h, EAR_TILE.d, EAR_TILE.r);

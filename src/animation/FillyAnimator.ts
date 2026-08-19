@@ -20,7 +20,7 @@ import {
   createPose,
   type FillyPose,
   type FillyState,
-} from "@/core/types";
+} from "../core/types";
 import { BLINK_ARC, BlinkController } from "./blink";
 import { StateModulator } from "./modulators";
 import { Rng } from "./rng";

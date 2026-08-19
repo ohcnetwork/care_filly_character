@@ -3,7 +3,7 @@
  * the canvas-painted mouth decal.
  */
 import * as THREE from "three";
-import { PALETTE } from "@/core/palette";
+import { PALETTE } from "../core/palette";
 import { createCanvasSurface, type CanvasSurface } from "./canvas";
 import { getEyeArcGeometry, getMouthPlaneGeometry, getUnitSphereGeometry, MOUTH_PLANE } from "./geometry";
 import type { FillyMaterials } from "./materials";
@@ -35,7 +35,7 @@ export const EYE = {
   lookY: 0.03,
   /** Ball hidden below this openness; arc fully in by 0.05 → 0.25. */
   hideBelow: 0.08,
-  browTilt: 0.15,
+  browTilt: 0.25,
 } as const;
 
 /** One eye: socket group → lid (squashes) → ball (gaze) + fixed highlights; plus the closed arc. */
@@ -73,7 +73,7 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   // Both highlights sit upper-left / lower-right on BOTH eyes (fixed to view).
   const big = new THREE.Mesh(unit, materials.eyeHighlight);
   big.name = "highlightBig";
-  big.scale.setScalar(0.048);
+  big.scale.set(0.054, 0.046, 0.054); // slightly oval, like the sheet
   big.position.set(-0.05, 0.055, 0.125);
   const small = new THREE.Mesh(unit, materials.eyeHighlight);
   small.name = "highlightSmall";
@@ -141,7 +141,7 @@ export function buildCheek(side: -1 | 1, materials: FillyMaterials): THREE.Mesh 
   const cheek = new THREE.Mesh(getUnitSphereGeometry(), materials.cheek);
   cheek.name = side < 0 ? "cheekL" : "cheekR";
   // Sheet: pink ovals ≈ 0.16 × 0.12 at (±0.41, −0.21), just under the eyes.
-  cheek.scale.set(0.1, 0.072, 0.02);
+  cheek.scale.set(0.11, 0.076, 0.02);
   placeOnSphere(cheek, side * 0.41, -0.21, 0.8, 0.945);
   return cheek;
 }

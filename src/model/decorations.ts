@@ -4,7 +4,7 @@
  * opacity from the pose and a gentle time-driven loop.
  */
 import * as THREE from "three";
-import { PALETTE } from "@/core/palette";
+import { PALETTE } from "../core/palette";
 import { createCanvasSurface } from "./canvas";
 import type { FillyMaterials } from "./materials";
 
@@ -136,7 +136,7 @@ export class FillyDecorations {
     const angles = [0.35, 0.95, 1.55]; // radians from +x, fanning toward up
     for (let i = 0; i < angles.length; i++) {
       const holder = new THREE.Group();
-      holder.position.set(1.08, 0.62, 0.3);
+      holder.position.set(1.1, 0.3, 0.3);
       holder.rotation.z = angles[i] - Math.PI / 2; // cylinder's +y → radial direction
       const mesh = new THREE.Mesh(geo, this.cloneAccent(materials));
       mesh.name = `spark${i}`;

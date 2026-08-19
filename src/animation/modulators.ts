@@ -8,7 +8,7 @@
  *   the springs, scaled by a smoothed per-state weight, because the springs
  *   would otherwise filter the faster motion away.
  */
-import type { FillyPose, FillyState } from "@/core/types";
+import type { FillyPose, FillyState } from "../core/types";
 import type { Rng } from "./rng";
 import { MouthEnvelope } from "./talking";
 

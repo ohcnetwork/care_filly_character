@@ -54,14 +54,16 @@ describe("computeMouthShape", () => {
     expect(b.width / a.width).toBeCloseTo(1.5);
   });
 
-  it("round = 1 gives a near-circular bbox, symmetric about the centre, no tongue", () => {
+  it("round = 1 gives a near-circular bbox, symmetric about the centre, faint tongue", () => {
     const s = computeMouthShape({ open: 0.6, wide: 1, smile: 0.8, round: 1 });
     expect(s.closed).toBe(false);
     expect(s.width / s.height).toBeGreaterThan(0.85);
     expect(s.width / s.height).toBeLessThan(1.15);
     expect(s.T.y).toBeCloseTo(-s.B.y);
     expect(s.L.y).toBeCloseTo(0);
-    expect(s.tongue.alpha).toBe(0);
+    // Round "o" keeps a hint of tongue (40 % of the D-shape's), like the sheet's surprised face.
+    expect(s.tongue.alpha).toBeGreaterThan(0);
+    expect(s.tongue.alpha).toBeLessThan(0.5);
     // Corner handles are vertical (round corners, not pointed).
     expect(Math.abs(s.LtoT.y - s.L.y)).toBeGreaterThan(0.005);
   });

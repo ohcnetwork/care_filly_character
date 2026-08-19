@@ -5,7 +5,7 @@
  * Conventions (see `FillyPose`): `eyeLookX` + = viewer's right, `eyeLookY` +
  * = up; `bodyPitch` + = lean toward the viewer / look down.
  */
-import { DEFAULT_POSE, POSE_KEYS, type FillyPose, type FillyState } from "@/core/types";
+import { DEFAULT_POSE, POSE_KEYS, type FillyPose, type FillyState } from "../core/types";
 
 /** Idle is the neutral sheet pose: small open smile with tongue, cheeks .6. */
 const IDLE: Readonly<FillyPose> = DEFAULT_POSE;
@@ -15,6 +15,7 @@ const LISTENING: Readonly<FillyPose> = Object.freeze({
   earL: 0.28,
   earR: 0.28,
   bodyPitch: 0.06,
+  bodyYaw: -0.05,
   eyeScale: 1.06,
   mouthOpen: 0,
   mouthSmile: 0.9,
@@ -29,6 +30,7 @@ const TALKING: Readonly<FillyPose> = Object.freeze({
   mouthOpen: 0,
   mouthSmile: 0.6,
   mouthWide: 1.2,
+  bodyYaw: 0.05,
   sparks: 0.5,
   cheek: 0.6,
 });
@@ -43,6 +45,9 @@ const HAPPY: Readonly<FillyPose> = Object.freeze({
   mouthWide: 1.25,
   mouthSmile: 1,
   cheek: 1,
+  bodyRoll: 0.08,
+  armL: 0.9,
+  armR: 0.9,
 });
 
 const THINKING: Readonly<FillyPose> = Object.freeze({
@@ -51,9 +56,9 @@ const THINKING: Readonly<FillyPose> = Object.freeze({
   eyeLookY: 0.6,
   mouthSmile: -0.6,
   mouthOpen: 0,
-  mouthWide: 0.8,
-  browL: -0.4,
-  browR: -0.4,
+  mouthWide: 0.6,
+  browL: -0.7,
+  browR: -0.7,
   armLChin: 1,
   armL: 0.6,
   bodyRoll: -0.06,
@@ -70,11 +75,11 @@ const SURPRISED: Readonly<FillyPose> = Object.freeze({
   eyeLookX: 0,
   eyeLookY: 0,
   mouthRound: 1,
-  mouthOpen: 0.7,
-  mouthWide: 0.85,
+  mouthOpen: 0.9,
+  mouthWide: 1,
   mouthSmile: 0,
-  earL: 0.45,
-  earR: 0.45,
+  earL: 0.3,
+  earR: 0.3,
   armL: 0.35,
   armR: 0.35,
   sparks: 1,
@@ -91,12 +96,12 @@ const SLEEPY: Readonly<FillyPose> = Object.freeze({
   mouthOpen: 0.18,
   mouthWide: 0.55,
   mouthSmile: 0,
-  bodyPitch: 0.09,
+  bodyPitch: 0.05,
   bodyY: -0.03,
-  bodyScaleX: 1.03,
-  bodyScaleY: 0.97,
-  earL: -0.35,
-  earR: -0.35,
+  bodyScaleX: 1.06,
+  bodyScaleY: 0.94,
+  earL: -0.18,
+  earR: -0.18,
   armL: -0.1,
   armR: -0.1,
   zzz: 1,

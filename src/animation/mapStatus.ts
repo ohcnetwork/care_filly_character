@@ -1,7 +1,7 @@
 /**
  * Mapping from the care_filly_fe plugin's `FillyStatus` to a character state.
  */
-import type { FillyState } from "@/core/types";
+import type { FillyState } from "../core/types";
 
 /** Status union used by the CARE voice-documentation plugin. */
 export type FillyStatus = "idle" | "recording" | "paused" | "processing" | "completed" | "failed";

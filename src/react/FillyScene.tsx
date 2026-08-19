@@ -7,16 +7,17 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import type { FillyAnimator } from "@/animation/FillyAnimator";
-import { FillyModel } from "@/model/FillyModel";
+import type { FillyAnimator } from "../animation/FillyAnimator";
+import { FillyModel } from "../model/FillyModel";
 
 /** Where the camera looks (slightly below the body centre so the feet/shadow read). */
 export const CAMERA_TARGET: readonly [number, number, number] = [0, -0.02, 0];
 /** Default camera placement — matches the reference sheet framing. */
-export const CAMERA_POSITION: readonly [number, number, number] = [0, 0.2, 5.6];
-export const CAMERA_FOV = 32;
+export const CAMERA_POSITION: readonly [number, number, number] = [0, 0.22, 6.9];
+/** Long-ish lens: the sheet reads near-orthographic. */
+export const CAMERA_FOV = 26;
 /** Brightness of the procedural RoomEnvironment reflections. */
-export const ENVIRONMENT_INTENSITY = 0.45;
+export const ENVIRONMENT_INTENSITY = 0.65;
 
 export interface FillyFreeze {
   /** Deterministic time to step the animator to (after `reset()`). */
@@ -135,9 +136,9 @@ export function FillyScene({ animator, running, freeze, onReady }: FillyScenePro
 
   return (
     <>
-      <hemisphereLight args={["#f6fff0", "#7ea76a", 0.75]} />
-      <directionalLight position={[3, 4.5, 5]} intensity={1.55} />
-      <directionalLight position={[-3, 1, 4]} intensity={0.45} />
+      <hemisphereLight args={["#f6fff0", "#7ea76a", 0.9]} />
+      <directionalLight position={[3, 4.5, 5]} intensity={1.35} />
+      <directionalLight position={[-3, 1, 4]} intensity={0.6} />
       <directionalLight position={[0, 3, -4]} intensity={0.5} />
     </>
   );

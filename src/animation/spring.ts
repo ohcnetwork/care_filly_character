@@ -3,7 +3,7 @@
  * semi-implicit (symplectic) Euler in fixed sub-steps so a frame of up to
  * `MAX_DT` seconds stays stable even for the stiffest presets.
  */
-import type { PoseKey } from "@/core/types";
+import type { PoseKey } from "../core/types";
 
 export interface SpringConfig {
   /** Stiffness k (higher = faster). */

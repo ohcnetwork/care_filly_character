@@ -4,7 +4,7 @@
  * at import time; effects only run in the browser).
  */
 import { useEffect, useState, type RefObject } from "react";
-import type { FillyAnimator } from "@/animation/FillyAnimator";
+import type { FillyAnimator } from "../animation/FillyAnimator";
 
 /**
  * True while `element` intersects the viewport. Falls back to `true` where

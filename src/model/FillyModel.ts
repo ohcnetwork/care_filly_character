@@ -12,7 +12,7 @@
  *         ├─ body, ears, side tiles, arms, feet, eyes, cheeks, mouth
  */
 import * as THREE from "three";
-import { POSE_BOUNDS, type FillyPose, type PoseKey } from "@/core/types";
+import { POSE_BOUNDS, type FillyPose, type PoseKey } from "../core/types";
 import { FillyDecorations } from "./decorations";
 import { applyEyePose, buildCheek, buildEye, MouthDecal, type EyeRig } from "./face";
 import { getBodyGeometry } from "./geometry";

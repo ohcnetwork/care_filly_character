@@ -25,7 +25,7 @@ export default defineConfig({
     emptyOutDir: false,
     rollupOptions: {
       external: (id) =>
-        /^(react|react-dom|react\/jsx-runtime|three|@react-three\/fiber)($|\/)/.test(id),
+        /^(react|react-dom|react\/jsx-runtime|three|three-bvh-csg|three-mesh-bvh|@react-three\/fiber)($|\/)/.test(id),
     },
   },
 });
