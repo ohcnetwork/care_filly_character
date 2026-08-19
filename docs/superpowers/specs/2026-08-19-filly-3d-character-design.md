@@ -10,8 +10,18 @@ Status: approved-by-default (autonomous session; assumptions listed below)
 > small **eyebrows**; taller ear tabs with the plate stem running up between them; the face
 > plate sitting higher (eyes ≈ +0.17 R); a **closed smile** for idle/blink/listening/sleepy;
 > happy with closed "^ ^" eyes; arm raises in listening/talking/happy/surprised. The anatomy
-> table below describes v1; `src/core/palette.ts`, `src/model/{geometry,limbs,face}.ts` and
-> `src/animation/states.ts` now encode v2 and are the source of truth.
+> table below describes v1.
+>
+> **Reference v3 — hero illustration (same day, final):** the user then supplied a single hero
+> render and asked to match it as closely as possible. This is what the code now encodes: a
+> wide oval body (`BODY_SCALE` 1 × 0.8 × 0.88), a blocky dark-emerald cross (bar + lower stem)
+> with a pale **notch** between two flat ear tabs (no dark stem between the ears), square side
+> tiles flush with the bar ends, solid black glossy eyes with a white + soft-green highlight (no
+> iris, no brows — both remain available as options), tone-on-tone green cheeks, an open smile
+> with a green tongue, chunky tilted arms and big feet, and soft near-flat lighting. The
+> expressions still follow the animation sheet. `src/core/palette.ts`,
+> `src/model/{geometry,limbs,face}.ts`, `src/animation/states.ts` and `src/react/FillyScene.tsx`
+> are the source of truth.
 
 ## 1. Goal
 

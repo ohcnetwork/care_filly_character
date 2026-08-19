@@ -12,8 +12,12 @@
 The geometry is **procedural** (no model files to load, no network fetches — CARE deployments
 may be offline): a mint sphere with a CSG-recessed plus/cross face plate, raised ear and side
 tiles, glossy eyes, a canvas-painted mouth and state decorations (zZ, thought bubbles, sound
-waves, sparks). The look is tuned against the CARE mascot design sheet (v2 — green-iris eyes,
-brows, emerald plate; `reference/animation-states-sheet.png` is the earlier v1 sheet).
+waves, sparks). The look is matched to the CARE mascot **hero illustration** (wide oval body, blocky
+emerald cross with a light notch between two flat ear tabs, solid glossy eyes, tone-on-tone green
+cheeks, green tongue) and the animation states come from `reference/animation-states-sheet.png`.
+Every look/feel knob is a constant in `src/core/palette.ts`, `src/model/{geometry,limbs,face}.ts`
+and `src/animation/states.ts` (e.g. pink cheeks: `PALETTE.cheek = "#f0aeaa"`; green iris eyes:
+`new FillyModel({ irisTexture: true })`).
 
 ---
 

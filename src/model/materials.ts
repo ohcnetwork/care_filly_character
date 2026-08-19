@@ -17,8 +17,10 @@ export interface FillyMaterials {
   limb: THREE.MeshPhysicalMaterial;
   /** Glossy black eyeballs. */
   eye: THREE.MeshPhysicalMaterial;
-  /** Unlit white eye highlights. */
+  /** Unlit white eye highlight (big, upper-left). */
   eyeHighlight: THREE.MeshBasicMaterial;
+  /** Unlit soft-green secondary highlight (small, lower-right). */
+  eyeHighlightSoft: THREE.MeshBasicMaterial;
   /** Closed-eye arcs (blink / happy / sleepy). Cloned per eye for opacity. */
   eyeLid: THREE.MeshStandardMaterial;
   /** Eyebrow arcs. */
@@ -93,11 +95,11 @@ export function buildFillyMaterials(): FillyMaterials {
   const cheek = new THREE.MeshStandardMaterial({
     color: PALETTE.cheek,
     emissive: PALETTE.cheek,
-    emissiveIntensity: 1.0,
+    emissiveIntensity: 0.35,
     roughness: MATERIALS.cheek.roughness,
     metalness: 0,
     transparent: true,
-    opacity: 0.9,
+    opacity: 1,
     depthWrite: false,
     name: "filly-cheek",
   });
@@ -128,6 +130,11 @@ export function buildFillyMaterials(): FillyMaterials {
     toneMapped: false,
     name: "filly-eyeHighlight",
   });
+  const eyeHighlightSoft = new THREE.MeshBasicMaterial({
+    color: PALETTE.eyeHighlightSoft,
+    toneMapped: false,
+    name: "filly-eyeHighlightSoft",
+  });
 
   return {
     body: toyMaterial(PALETTE.body, MATERIALS.body, "filly-body"),
@@ -136,6 +143,7 @@ export function buildFillyMaterials(): FillyMaterials {
     limb: toyMaterial(PALETTE.limb, MATERIALS.limb, "filly-limb"),
     eye: toyMaterial(PALETTE.eye, MATERIALS.eye, "filly-eye"),
     eyeHighlight,
+    eyeHighlightSoft,
     eyeLid,
     brow,
     cheek,

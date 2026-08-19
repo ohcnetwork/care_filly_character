@@ -51,7 +51,7 @@ export interface MouthShape {
 }
 
 /** Base half-width at wide = 1 (world units). */
-export const MOUTH_BASE_HALF_WIDTH = 0.092;
+export const MOUTH_BASE_HALF_WIDTH = 0.1;
 /** Below this `open` the mouth is a closed lip line. */
 export const MOUTH_CLOSED_THRESHOLD = 0.04;
 

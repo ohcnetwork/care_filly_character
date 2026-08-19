@@ -12,25 +12,45 @@ import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import type { FillyMaterialKey } from "./materials";
 import { buildPlateDecalGeometry } from "./plateFallback";
 
-/** Body sphere radius. */
+/** Body sphere radius (before {@link BODY_SCALE}). */
 export const BODY_RADIUS = 1;
-/** Radius of the recessed plate floor (sphere centred at the origin). */
+/**
+ * The hero illustration's body is a wide oval: the unit sphere is scaled by
+ * this before the plate is cut. x is the "body unit" used by every layout
+ * constant; y/z are the oblate factors.
+ */
+export const BODY_SCALE = { x: 1, y: 0.8, z: 0.88 } as const;
+/** Lowest point of the body ellipsoid (feet hang slightly below it). */
+export const BODY_BOTTOM = -BODY_SCALE.y;
+/** Radius of the recessed plate floor (same ellipsoid, scaled down). */
 export const PLATE_RADIUS = 0.93;
 
-/** Rounded plus ("cross") outline of the face plate, in the XY plane. */
+/** z on the body surface (scaled ellipsoid of radius `r`) at (x, y); 0 outside. */
+export function bodyZ(x: number, y: number, r = BODY_RADIUS): number {
+  const nx = x / (r * BODY_SCALE.x);
+  const ny = y / (r * BODY_SCALE.y);
+  return r * BODY_SCALE.z * Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+}
+
+/**
+ * Face plate outline in the XY plane: a wide horizontal bar with a narrower
+ * stem below it, and a NOTCH cut into the top centre between the two ear tabs
+ * (the pale body shows through there — there is no dark stem going up).
+ * Corners are only slightly rounded: the hero plate reads blocky.
+ */
 export const PLUS_SHAPE = {
-  /** Vertical bar half-width (sheet v2: stem ≈ ±0.2). */
-  vHalfWidth: 0.2,
-  /** Stem runs down to the lower third… */
-  vBottom: -0.62,
-  /** …and up between the ear tiles to about their mid-height (dark notch). */
-  vTop: 0.82,
+  /** Lower stem half-width. */
+  vHalfWidth: 0.18,
+  /** Stem bottom. */
+  vBottom: -0.43,
   /** Horizontal bar half-width (ends where the side tiles start). */
-  hHalfWidth: 0.54,
-  /** Bar sits high: eyes in its upper half, mouth near the centre line. */
-  hBottom: -0.22,
-  hTop: 0.52,
-  cornerRadius: 0.06,
+  hHalfWidth: 0.56,
+  hBottom: -0.18,
+  hTop: 0.58,
+  /** Notch between the ears: half-width (= ears' inner edges) and depth below hTop. */
+  notchHalfWidth: 0.18,
+  notchDepth: 0.12,
+  cornerRadius: 0.025,
 } as const;
 
 /** Body sphere tessellation. */
@@ -38,21 +58,23 @@ const BODY_SEGMENTS_W = 96;
 const BODY_SEGMENTS_H = 64;
 
 /**
- * Build a THREE.Shape for the rounded plus. Corners (convex and concave) are
- * rounded with quadratic curves so the silhouette matches the reference.
+ * Build a THREE.Shape for the plate outline (bar + stem + top notch). Corners
+ * (convex and concave) are rounded with small quadratic curves.
  */
 export function buildRoundedPlusShape(p = PLUS_SHAPE): THREE.Shape {
-  const { vHalfWidth: vw, vBottom: vy0, vTop: vy1, hHalfWidth: hw, hBottom: hy0, hTop: hy1 } = p;
-  // 12 polygon vertices, counter-clockwise, starting bottom-right of the vertical bar.
+  const { vHalfWidth: vw, vBottom: vy0, hHalfWidth: hw, hBottom: hy0, hTop: hy1 } = p;
+  const nw = p.notchHalfWidth;
+  const ny = hy1 - p.notchDepth;
+  // Counter-clockwise, starting bottom-right of the stem.
   const pts: Array<[number, number]> = [
     [vw, vy0],
     [vw, hy0],
     [hw, hy0],
     [hw, hy1],
-    [vw, hy1],
-    [vw, vy1],
-    [-vw, vy1],
-    [-vw, hy1],
+    [nw, hy1],
+    [nw, ny],
+    [-nw, ny],
+    [-nw, hy1],
     [-hw, hy1],
     [-hw, hy0],
     [-vw, hy0],
@@ -126,16 +148,14 @@ function buildBodyCSG(): BodyGeometry {
     bevelEnabled: false,
     curveSegments: 6,
   });
-  plusGeo.translate(0, 0, 0.5); // spans z 0.5 → 1.3
+  plusGeo.translate(0, 0, 0.3); // spans z 0.3 → 1.1 (through the oval's front)
   const plusBrush = new Brush(plusGeo, bodyMat);
-  const innerBrush = new Brush(
-    new THREE.SphereGeometry(PLATE_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H),
-    plateMat,
-  );
-  const sphereBrush = new Brush(
-    new THREE.SphereGeometry(BODY_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H),
-    bodyMat,
-  );
+  const innerGeo = new THREE.SphereGeometry(PLATE_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H);
+  innerGeo.scale(BODY_SCALE.x, BODY_SCALE.y, BODY_SCALE.z);
+  const innerBrush = new Brush(innerGeo, plateMat);
+  const bodyGeo = new THREE.SphereGeometry(BODY_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H);
+  bodyGeo.scale(BODY_SCALE.x, BODY_SCALE.y, BODY_SCALE.z);
+  const sphereBrush = new Brush(bodyGeo, bodyMat);
   plusBrush.updateMatrixWorld();
   innerBrush.updateMatrixWorld();
   sphereBrush.updateMatrixWorld();
@@ -169,6 +189,7 @@ function buildBodyCSG(): BodyGeometry {
 
 function buildBodyFallback(): BodyGeometry {
   const geometry = new THREE.SphereGeometry(BODY_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H);
+  geometry.scale(BODY_SCALE.x, BODY_SCALE.y, BODY_SCALE.z);
   return {
     geometry,
     slots: ["body"],
@@ -221,12 +242,12 @@ export function getRoundedBoxGeometry(
 }
 
 /**
- * Ear tile dimensions (width, height, depth, corner radius). Wide upright
- * slabs that sit flush against the plus stem (inner edge ≈ ±0.18, outer ≈ ±0.64).
+ * Ear tab dimensions (width, height, depth, corner radius): flat blocky slabs
+ * standing straight up from the bar's top edge (inner edge ≈ ±0.18).
  */
-export const EAR_TILE = { w: 0.37, h: 0.54, d: 0.26, r: 0.14 } as const;
-/** Side tile dimensions — large rounded squares butting the bar ends. */
-export const SIDE_TILE = { w: 0.42, h: 0.52, d: 0.3, r: 0.15 } as const;
+export const EAR_TILE = { w: 0.38, h: 0.45, d: 0.3, r: 0.04 } as const;
+/** Side tile dimensions — squares butting the bar ends (flat, small radius). */
+export const SIDE_TILE = { w: 0.38, h: 0.38, d: 0.26, r: 0.04 } as const;
 
 export function getEarTileGeometry(): RoundedBoxGeometry {
   return getRoundedBoxGeometry(EAR_TILE.w, EAR_TILE.h, EAR_TILE.d, EAR_TILE.r);

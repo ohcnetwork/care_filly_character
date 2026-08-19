@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { afterAll, describe, expect, it } from "vitest";
 import { createPose, DEFAULT_POSE, POSE_BOUNDS, POSE_KEYS } from "@/core/types";
-import { FillyModel, FILLY_MODEL_BOUNDS } from "./FillyModel";
+import { BODY_SCALE } from "@/model/geometry";
+import { BODY_LIFT, FillyModel, FILLY_MODEL_BOUNDS } from "./FillyModel";
 import { disposeFillyGeometryCache, getBodyGeometry } from "./geometry";
 
 function expectFiniteMatrices(root: THREE.Object3D): void {
@@ -27,9 +28,9 @@ describe("body geometry", () => {
     expect(tris).toBeGreaterThan(5000);
     expect(tris).toBeLessThan(40000);
     body.geometry.computeBoundingBox();
-    // Plate floor is recessed: nothing reaches z = 1 at the front.
-    expect(body.geometry.boundingBox!.max.z).toBeLessThan(0.95);
-    expect(body.geometry.boundingBox!.min.y).toBeCloseTo(-1, 3);
+    // Plate floor is recessed: nothing reaches the oval's front (z = BODY_SCALE.z).
+    expect(body.geometry.boundingBox!.max.z).toBeLessThan(BODY_SCALE.z - 0.03);
+    expect(body.geometry.boundingBox!.min.y).toBeCloseTo(-BODY_SCALE.y, 3);
   });
 
   it("is cached across calls", () => {
@@ -47,7 +48,7 @@ describe("FillyModel", () => {
     expect(model.parts.earL.parent).toBe(model.parts.bodyGroup);
     expect(model.parts.shadow.parent).toBe(model);
     expect(model.parts.bodyPivot.position.y).toBe(-1);
-    expect(model.parts.bodyGroup.position.y).toBe(1);
+    expect(model.parts.bodyGroup.position.y).toBeCloseTo(BODY_LIFT, 6);
     // No DOM here: the mouth decal hides itself rather than showing a blank plane.
     expect(model.parts.mouth.visible).toBe(false);
     model.dispose();
@@ -121,7 +122,7 @@ describe("FillyModel", () => {
     const hl = eyeL.getObjectByName("highlightBig")!;
     // Gaze rotates the textured ball (look right → positive yaw); highlights stay put.
     expect(ball.rotation.y).toBeGreaterThan(0);
-    expect(hl.position.x).toBeCloseTo(-0.055);
+    expect(hl.position.x).toBeCloseTo(-0.045);
 
     // Decorations toggle visibility with their master opacity.
     expect(model.parts.decorations.getObjectByName("zzz")!.visible).toBe(false);

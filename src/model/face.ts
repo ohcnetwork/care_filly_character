@@ -6,11 +6,14 @@ import * as THREE from "three";
 import { PALETTE } from "../core/palette";
 import { createCanvasSurface, type CanvasSurface } from "./canvas";
 import {
+  BODY_SCALE,
+  bodyZ,
   getBrowGeometry,
   getEyeArcGeometry,
   getMouthPlaneGeometry,
   getUnitSphereGeometry,
   MOUTH_PLANE,
+  PLATE_RADIUS,
 } from "./geometry";
 import type { FillyMaterials } from "./materials";
 import {
@@ -31,20 +34,26 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
 
 /** Eye layout constants (body units). */
 export const EYE = {
-  /** Sheet v2: eyes at ≈ (±0.31, +0.17), r ≈ 0.16, bulging past the plate. */
-  x: 0.31,
-  y: 0.17,
-  z: 0.82,
-  radius: 0.175,
-  /** Gaze rotation (radians) at lookX/lookY = ±1. */
+  /** Hero image: eyes at ≈ (±0.335, +0.23), r ≈ 0.128, sitting on the plate. */
+  x: 0.335,
+  y: 0.23,
+  /** Centre depth: just behind the plate floor so the ball bulges ≈0.1 out of it. */
+  z: bodyZ(0.335, 0.23, PLATE_RADIUS) - 0.03,
+  radius: 0.135,
+  /** Gaze displacement at lookX/lookY = ±1 (solid eye: the ball slides). */
+  lookX: 0.03,
+  lookY: 0.025,
+  /** Gaze rotation (radians) — only visible when the optional iris texture is on. */
   lookYaw: 0.38,
   lookPitch: 0.32,
   /** Ball hidden below this openness; arc fully in by 0.05 → 0.25. */
   hideBelow: 0.08,
+  /** The hero has no eyebrows; the arcs exist for the optional expressive look. */
+  showBrows: false,
   /** Brow tilt at brow = ±1 (− = inner ends up / worried). */
   browTilt: 0.45,
   /** Brow rest height above the eye centre and extra lift when eyes widen. */
-  browY: 0.225,
+  browY: 0.2,
   browLift: 0.25,
 } as const;
 
@@ -145,15 +154,16 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   ball.scale.setScalar(EYE.radius);
   lid.add(ball);
 
-  // Both highlights sit upper-left / lower-right on BOTH eyes (fixed to view).
+  // Both highlights sit upper-left / lower-right on BOTH eyes (fixed to view):
+  // a big white one and a small soft-green one, like the hero image.
   const big = new THREE.Mesh(unit, materials.eyeHighlight);
   big.name = "highlightBig";
-  big.scale.set(0.054, 0.048, 0.054); // slightly oval, like the sheet
-  big.position.set(-0.06, 0.065, 0.15);
-  const small = new THREE.Mesh(unit, materials.eyeHighlight);
+  big.scale.setScalar(0.042);
+  big.position.set(-0.045, 0.048, 0.105);
+  const small = new THREE.Mesh(unit, materials.eyeHighlightSoft);
   small.name = "highlightSmall";
-  small.scale.setScalar(0.022);
-  small.position.set(0.065, -0.055, 0.155);
+  small.scale.setScalar(0.019);
+  small.position.set(0.05, -0.045, 0.112);
   lid.add(big, small);
 
   const arcMaterial = materials.eyeLid.clone();
@@ -168,6 +178,7 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   const brow = new THREE.Mesh(getBrowGeometry(), materials.brow);
   brow.name = "brow";
   brow.position.set(0, EYE.browY, -0.02);
+  brow.visible = EYE.showBrows;
   group.add(brow);
 
   return { group, lid, ball, highlights: [big, small], arc, arcMaterial, brow, side };
@@ -191,7 +202,9 @@ export function applyEyePose(
   eye.lid.visible = lidVisible;
   eye.lid.scale.y = Math.max(openness, 0.02);
 
-  // Gaze: rotate the textured ball (iris + pupil travel on the sphere).
+  // Gaze: the ball slides a little (visible on the solid eye) and rotates
+  // (visible only with the optional iris texture).
+  eye.ball.position.set(lookX * EYE.lookX, lookY * EYE.lookY, 0);
   eye.ball.rotation.set(-lookY * EYE.lookPitch, lookX * EYE.lookYaw, 0);
 
   // Closed arc: +1 happy "^", −1 sleepy "︶"; never fully flat.
@@ -212,21 +225,28 @@ export function applyEyePose(
 const scratchDir = new THREE.Vector3();
 const scratchTarget = new THREE.Vector3();
 
-/** Place `obj` on the sphere of `radius` along direction (x, y, z), facing outward. */
-export function placeOnSphere(obj: THREE.Object3D, x: number, y: number, z: number, radius: number): void {
-  scratchDir.set(x, y, z).normalize();
-  obj.position.copy(scratchDir).multiplyScalar(radius);
-  scratchTarget.copy(scratchDir).multiplyScalar(radius + 1);
+/**
+ * Place `obj` on the body ellipsoid of radius `r` at (x, y) (z derived), facing
+ * outward along the ellipsoid normal.
+ */
+export function placeOnBody(obj: THREE.Object3D, x: number, y: number, r: number): void {
+  const z = bodyZ(x, y, r);
+  obj.position.set(x, y, z);
+  // Ellipsoid normal ∝ (x/sx², y/sy², z/sz²).
+  scratchDir
+    .set(x / (BODY_SCALE.x * BODY_SCALE.x), y / (BODY_SCALE.y * BODY_SCALE.y), z / (BODY_SCALE.z * BODY_SCALE.z))
+    .normalize();
+  scratchTarget.copy(obj.position).add(scratchDir);
   obj.lookAt(scratchTarget);
 }
 
-/** Flattened blush disc on the plate. Shares the cheek material (opacity is common). */
+/** Flattened cheek oval on the plate. Shares the cheek material (opacity is common). */
 export function buildCheek(side: -1 | 1, materials: FillyMaterials): THREE.Mesh {
   const cheek = new THREE.Mesh(getUnitSphereGeometry(), materials.cheek);
   cheek.name = side < 0 ? "cheekL" : "cheekR";
-  // Sheet: pink ovals ≈ 0.16 × 0.12 at (±0.41, −0.21), just under the eyes.
-  cheek.scale.set(0.1, 0.07, 0.02);
-  placeOnSphere(cheek, side * 0.4, -0.05, 0.8, 0.945);
+  // Hero: wide ovals ≈ 0.29 × 0.14 at (±0.44, +0.05), under the outer eye edge.
+  cheek.scale.set(0.14, 0.068, 0.02);
+  placeOnBody(cheek, side * 0.44, 0.05, PLATE_RADIUS + 0.015);
   return cheek;
 }
 
@@ -312,8 +332,8 @@ export class MouthDecal {
     this.mesh = new THREE.Mesh(getMouthPlaneGeometry(), this.material);
     this.mesh.name = "mouth";
     this.mesh.renderOrder = 1;
-    // Sheet: mouth centred at y ≈ −0.11, at the bar/stem junction.
-    placeOnSphere(this.mesh, 0, -0.07, 0.912, 0.95);
+    // Hero: mouth centred at y ≈ +0.08, between and just below the eyes.
+    placeOnBody(this.mesh, 0, 0.08, PLATE_RADIUS + 0.02);
     // Without a DOM there is nothing to paint: hide the bare plane.
     this.mesh.visible = this.surface !== null;
   }

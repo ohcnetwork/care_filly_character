@@ -7,23 +7,23 @@
  */
 import { DEFAULT_POSE, POSE_KEYS, type FillyPose, type FillyState } from "../core/types";
 
-/** Idle is the neutral sheet pose: small closed smile, cheeks .7, brows relaxed. */
+/** Idle is the hero pose: small open smile with tongue, cheeks .8. */
 const IDLE: Readonly<FillyPose> = DEFAULT_POSE;
 
 const LISTENING: Readonly<FillyPose> = Object.freeze({
   ...DEFAULT_POSE,
-  earL: 0.22,
-  earR: 0.22,
+  earL: 0.15,
+  earR: 0.15,
   bodyPitch: 0.04,
   bodyYaw: -0.05,
-  bodyRoll: 0.1,
-  armR: 1.35,
+  bodyRoll: 0.06,
+  armR: 0.9,
   eyeScale: 1.06,
   mouthOpen: 0,
   mouthSmile: 0.9,
   mouthWide: 1,
   waves: 1,
-  cheek: 0.6,
+  cheek: 0.8,
 });
 
 /** Talking's mouth opening is driven entirely by the procedural envelope. */
@@ -33,24 +33,24 @@ const TALKING: Readonly<FillyPose> = Object.freeze({
   mouthSmile: 0.7,
   mouthWide: 1.15,
   bodyYaw: 0.05,
-  armR: 1.1,
+  armR: 0.7,
   sparks: 0.5,
-  cheek: 0.7,
+  cheek: 0.8,
 });
 
 const HAPPY: Readonly<FillyPose> = Object.freeze({
   ...DEFAULT_POSE,
-  eyeOpenL: 0,
-  eyeOpenR: 0,
+  eyeOpenL: 1,
+  eyeOpenR: 1,
   eyeArc: 1,
   eyeScale: 1.05,
-  mouthOpen: 0.8,
+  mouthOpen: 0.85,
   mouthWide: 1.25,
   mouthSmile: 1,
   cheek: 1,
   bodyRoll: 0.06,
-  armL: 1.25,
-  armR: 1.25,
+  armL: 0.9,
+  armR: 0.9,
 });
 
 const THINKING: Readonly<FillyPose> = Object.freeze({
@@ -81,10 +81,10 @@ const SURPRISED: Readonly<FillyPose> = Object.freeze({
   mouthOpen: 0.9,
   mouthWide: 1,
   mouthSmile: 0,
-  earL: 0.3,
-  earR: 0.3,
-  armL: 1.0,
-  armR: 1.0,
+  earL: 0.2,
+  earR: 0.2,
+  armL: 0.6,
+  armR: 0.6,
   sparks: 1,
   cheek: 0.5,
   bodyPitch: -0.05,
@@ -95,17 +95,17 @@ const SLEEPY: Readonly<FillyPose> = Object.freeze({
   eyeOpenL: 0,
   eyeOpenR: 0,
   eyeArc: -1,
-  mouthRound: 0,
-  mouthOpen: 0,
-  mouthWide: 0.7,
-  mouthSmile: 0.6,
+  mouthRound: 1,
+  mouthOpen: 0.2,
+  mouthWide: 0.55,
+  mouthSmile: 0,
   bodyPitch: 0.05,
   bodyY: -0.03,
   bodyScaleX: 1.06,
   bodyScaleY: 0.94,
-  earL: -0.18,
-  earR: -0.18,
-  armL: 0.45,
+  earL: -0.12,
+  earR: -0.12,
+  armL: -0.1,
   armR: -0.1,
   zzz: 1,
   cheek: 0.4,

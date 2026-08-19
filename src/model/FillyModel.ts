@@ -17,6 +17,7 @@ import { FillyDecorations } from "./decorations";
 import { applyEyePose, buildCheek, buildEye, ensureEyeTexture, MouthDecal, type EyeRig } from "./face";
 import { getBodyGeometry } from "./geometry";
 import {
+  FEET_BOTTOM,
   applyArmPose,
   applyEarPose,
   buildArm,
@@ -29,14 +30,22 @@ import {
 import { buildFillyMaterials, type FillyMaterials } from "./materials";
 import { ContactShadow } from "./shadow";
 
+/**
+ * The body group is lifted so the foot bottoms rest on y = −1 (the ground);
+ * the body centre therefore sits at y = BODY_LIFT − 1 in model space.
+ */
+export const BODY_LIFT = -FEET_BOTTOM;
+
 /** Approximate extents of the rest-posed character, for camera framing. */
 export const FILLY_MODEL_BOUNDS = Object.freeze({
   /** Bottom of the contact shadow. */
   minY: -1.02,
-  /** Top of the ear tiles. */
-  maxY: 1.2,
+  /** Top of the ear tabs. */
+  maxY: BODY_LIFT - 1 + 1.06,
   /** Horizontal radius including side tiles and arms (decorations excluded). */
-  radius: 1.15,
+  radius: 1.1,
+  /** Vertical centre of the character in model space (for camera targets). */
+  centerY: (BODY_LIFT - 1 + 1.06 - 1.02) / 2,
 });
 
 export interface FillyModelOptions {
@@ -44,6 +53,8 @@ export interface FillyModelOptions {
   materials?: Partial<FillyMaterials>;
   /** Include the contact shadow plane (default true). */
   shadow?: boolean;
+  /** Paint a green iris + pupil onto the eyes (default false: solid glossy eyes like the hero). */
+  irisTexture?: boolean;
 }
 
 /** Named parts for external tweaking / debugging. */
@@ -118,7 +129,7 @@ export class FillyModel extends THREE.Group {
     bodyPivot.position.y = -1;
     const bodyGroup = new THREE.Group();
     bodyGroup.name = "bodyGroup";
-    bodyGroup.position.y = 1;
+    bodyGroup.position.y = BODY_LIFT;
     bodyPivot.add(bodyGroup);
     this.add(bodyPivot);
 
@@ -156,9 +167,9 @@ export class FillyModel extends THREE.Group {
       footR,
     );
 
-    // Face. The iris texture is attached to the shared eye material once per
-    // material set (null without a DOM → plain dark glossy eyes).
-    this.eyeTexture = ensureEyeTexture(mats);
+    // Face. Solid glossy eyes like the hero image; `irisTexture: true` paints a
+    // green iris onto the shared eye material instead (null without a DOM).
+    this.eyeTexture = opts.irisTexture ? ensureEyeTexture(mats) : null;
     this.eyeL = buildEye(-1, mats);
     this.eyeR = buildEye(1, mats);
     const cheekL = buildCheek(-1, mats);
@@ -220,7 +231,8 @@ export class FillyModel extends THREE.Group {
       clampKey("bodyYaw", pose.bodyYaw),
       clampKey("bodyRoll", pose.bodyRoll),
     );
-    this.fx.position.y = bodyY;
+    // Decorations are laid out around the body centre.
+    this.fx.position.y = bodyY + (BODY_LIFT - 1);
 
     applyEarPose(this.earL, clampKey("earL", pose.earL));
     applyEarPose(this.earR, clampKey("earR", pose.earR));
