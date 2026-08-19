@@ -8,13 +8,13 @@
  */
 export const PALETTE = {
   /** Very pale mint body. */
-  body: "#ddefd8",
+  body: "#d6ecd0",
   /** Recessed cross face plate — dark emerald. */
-  plate: "#33904b",
+  plate: "#2f8c48",
   /** Ear tabs and side tiles — medium spring green. */
-  tile: "#7ccd8d",
+  tile: "#74c887",
   /** Arms and feet — a step darker than the tiles. */
-  limb: "#5fbb72",
+  limb: "#5ab96e",
   /** Solid glossy eye — near-black with a green cast. */
   eye: "#0e2415",
   /** Unused when the eye is solid; kept for the optional iris texture. */
@@ -28,7 +28,7 @@ export const PALETTE = {
   eyeLid: "#0e2415",
   brow: "#0e2415",
   /** Cheeks are tone-on-tone green ovals on the plate (the sheet uses pink: try "#f0aeaa"). */
-  cheek: "#62bd74",
+  cheek: "#5fbf73",
   mouthInner: "#0f2a18",
   mouthLine: "#0f2a18",
   tongue: "#5fbb72",

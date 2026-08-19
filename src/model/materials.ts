@@ -49,6 +49,7 @@ function toyMaterial(
     sheen?: number;
     sheenRoughness?: number;
     metalness?: number;
+    vertexColors?: boolean;
   },
   name: string,
 ): THREE.MeshPhysicalMaterial {
@@ -58,6 +59,8 @@ function toyMaterial(
     metalness: params.metalness ?? 0,
     clearcoat: params.clearcoat,
     clearcoatRoughness: params.clearcoatRoughness,
+    // Baked top-light → bottom-shade gradients (see geometry.ts bakeVerticalGradient).
+    vertexColors: params.vertexColors ?? false,
   });
   if (params.sheen) {
     mat.sheen = params.sheen;
@@ -137,10 +140,10 @@ export function buildFillyMaterials(): FillyMaterials {
   });
 
   return {
-    body: toyMaterial(PALETTE.body, MATERIALS.body, "filly-body"),
-    plate: toyMaterial(PALETTE.plate, MATERIALS.plate, "filly-plate"),
-    tile: toyMaterial(PALETTE.tile, MATERIALS.tile, "filly-tile"),
-    limb: toyMaterial(PALETTE.limb, MATERIALS.limb, "filly-limb"),
+    body: toyMaterial(PALETTE.body, { ...MATERIALS.body, vertexColors: true }, "filly-body"),
+    plate: toyMaterial(PALETTE.plate, { ...MATERIALS.plate, vertexColors: true }, "filly-plate"),
+    tile: toyMaterial(PALETTE.tile, { ...MATERIALS.tile, vertexColors: true }, "filly-tile"),
+    limb: toyMaterial(PALETTE.limb, { ...MATERIALS.limb, vertexColors: true }, "filly-limb"),
     eye: toyMaterial(PALETTE.eye, MATERIALS.eye, "filly-eye"),
     eyeHighlight,
     eyeHighlightSoft,

@@ -12,12 +12,13 @@ import { FillyModel } from "../model/FillyModel";
 
 /** Where the camera looks (slightly below the body centre so the feet/shadow read). */
 export const CAMERA_TARGET: readonly [number, number, number] = [0, -0.06, 0];
+/** Camera sits level with the target: the illustration is a straight-on view (no box tops). */
 /** Default camera placement — matches the reference sheet framing. */
-export const CAMERA_POSITION: readonly [number, number, number] = [0, 0.1, 6.9];
-/** Long-ish lens: the sheet reads near-orthographic. */
-export const CAMERA_FOV = 26;
+export const CAMERA_POSITION: readonly [number, number, number] = [0, -0.06, 7.0];
+/** Long lens: the illustration reads near-orthographic. */
+export const CAMERA_FOV = 24;
 /** Brightness of the procedural RoomEnvironment reflections. */
-export const ENVIRONMENT_INTENSITY = 0.4;
+export const ENVIRONMENT_INTENSITY = 0.18;
 
 export interface FillyFreeze {
   /** Deterministic time to step the animator to (after `reset()`). */
@@ -65,8 +66,9 @@ function useCameraAndRenderer(): void {
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
   useLayoutEffect(() => {
-    // Neutral keeps the pastel greens; ACES pushed them toward white.
-    gl.toneMapping = THREE.NeutralToneMapping;
+    // No tone mapping: the illustration's pastel greens should come through
+    // exactly as authored (lights are kept below clipping instead).
+    gl.toneMapping = THREE.NoToneMapping;
     gl.toneMappingExposure = 1;
     gl.outputColorSpace = THREE.SRGBColorSpace;
     camera.lookAt(TARGET);
@@ -138,10 +140,11 @@ export function FillyScene({ animator, running, freeze, onReady }: FillyScenePro
     <>
       {/* Soft, almost flat light like the hero illustration: a bright sky dome,
           a gentle key from the upper left, a little fill, a whisper of rim. */}
-      <hemisphereLight args={["#ffffff", "#86ad8e", 1.25]} />
-      <directionalLight position={[-2.5, 5, 4]} intensity={0.75} />
-      <directionalLight position={[3, 1, 4]} intensity={0.35} />
-      <directionalLight position={[0, 3, -4]} intensity={0.25} />
+      {/* three uses physical light units (a Lambert surface needs ≈π of irradiance
+          to show its full albedo), hence the intensities. */}
+      <hemisphereLight args={["#ffffff", "#bfdcc3", 2.6]} />
+      <directionalLight position={[-2.5, 4, 5]} intensity={1.45} />
+      <directionalLight position={[3, 0.5, 4]} intensity={0.45} />
     </>
   );
 }

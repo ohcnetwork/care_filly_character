@@ -105,6 +105,85 @@ export function buildRoundedPlusShape(p = PLUS_SHAPE): THREE.Shape {
   return shape;
 }
 
+
+// ── baked shading ────────────────────────────────────────────────────────────
+//
+// The hero illustration is "flat design with soft shading": every shape has a
+// gentle top-light → bottom-shade gradient and the recessed plate has a soft
+// inner shadow along its top edge. Real-time lights alone can't give flat
+// front faces a gradient, so we bake these as vertex colours (materials use
+// `vertexColors: true`; the colour multiplies the albedo).
+
+const smooth01 = (e0: number, e1: number, x: number): number => {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * Write a vertical brightness gradient into `geometry`'s `color` attribute:
+ * `top` at y = yMax, `bottom` at y = yMin (linear in between).
+ */
+export function bakeVerticalGradient(
+  geometry: THREE.BufferGeometry,
+  yMin: number,
+  yMax: number,
+  bottom: number,
+  top: number,
+): THREE.BufferGeometry {
+  const pos = geometry.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = Math.min(1, Math.max(0, (pos.getY(i) - yMin) / (yMax - yMin)));
+    const f = bottom + (top - bottom) * t;
+    colors[i * 3] = f;
+    colors[i * 3 + 1] = f;
+    colors[i * 3 + 2] = f;
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
+/** Body shading: slightly brighter crown, slightly deeper bottom. */
+const BODY_SHADE = { bottom: 0.9, top: 1.04 } as const;
+/** Plate inner shadow: how much darker the floor gets right under the top edge, and how far it reaches. */
+const PLATE_INNER_SHADOW = { depth: 0.28, reach: 0.3 } as const;
+/** Tiles / limbs: a clear top-light → bottom-shade gradient like the illustration. */
+export const TILE_SHADE = { bottom: 0.9, top: 1.1 } as const;
+export const LIMB_SHADE = { bottom: 0.84, top: 1.06 } as const;
+
+/**
+ * Bake the body gradient plus the plate's inner shadow. Plate-floor vertices
+ * are found through the geometry groups (`slots[materialIndex] === "plate"`).
+ */
+function bakeBodyShading(geometry: THREE.BufferGeometry, slots: readonly FillyMaterialKey[]): void {
+  const pos = geometry.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  const isPlate = new Uint8Array(pos.count);
+  const index = geometry.index;
+  for (const g of geometry.groups) {
+    if (slots[g.materialIndex ?? 0] !== "plate") continue;
+    for (let i = g.start; i < g.start + g.count; i++) {
+      isPlate[index ? index.getX(i) : i] = 1;
+    }
+  }
+  const yMin = -BODY_SCALE.y;
+  const yMax = BODY_SCALE.y;
+  const edgeTop = PLUS_SHAPE.hTop;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    const t = Math.min(1, Math.max(0, (y - yMin) / (yMax - yMin)));
+    let f = BODY_SHADE.bottom + (BODY_SHADE.top - BODY_SHADE.bottom) * t;
+    if (isPlate[i]) {
+      // Soft shadow cast by the rim onto the floor, strongest at the top edge.
+      f *= 1 - PLATE_INNER_SHADOW.depth * smooth01(edgeTop - PLATE_INNER_SHADOW.reach, edgeTop - 0.01, y);
+    }
+    colors[i * 3] = f;
+    colors[i * 3 + 1] = f;
+    colors[i * 3 + 2] = f;
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
+
 /** Result of {@link getBodyGeometry}. */
 export interface BodyGeometry {
   /** Sphere with the plus recess (or a plain sphere when CSG failed). */
@@ -177,6 +256,7 @@ function buildBodyCSG(): BodyGeometry {
   if (!geometry.getAttribute("position") || slots.length === 0) {
     throw new Error("CSG produced an empty geometry");
   }
+  bakeBodyShading(geometry, slots);
 
   plusGeo.dispose();
   innerBrush.geometry.dispose();
@@ -190,6 +270,7 @@ function buildBodyCSG(): BodyGeometry {
 function buildBodyFallback(): BodyGeometry {
   const geometry = new THREE.SphereGeometry(BODY_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H);
   geometry.scale(BODY_SCALE.x, BODY_SCALE.y, BODY_SCALE.z);
+  bakeVerticalGradient(geometry, -BODY_SCALE.y, BODY_SCALE.y, BODY_SHADE.bottom, BODY_SHADE.top);
   return {
     geometry,
     slots: ["body"],
@@ -245,21 +326,43 @@ export function getRoundedBoxGeometry(
  * Ear tab dimensions (width, height, depth, corner radius): flat blocky slabs
  * standing straight up from the bar's top edge (inner edge ≈ ±0.18).
  */
-export const EAR_TILE = { w: 0.38, h: 0.45, d: 0.3, r: 0.04 } as const;
+export const EAR_TILE = { w: 0.38, h: 0.45, d: 0.24, r: 0.035 } as const;
 /** Side tile dimensions — squares butting the bar ends (flat, small radius). */
-export const SIDE_TILE = { w: 0.38, h: 0.38, d: 0.26, r: 0.04 } as const;
+export const SIDE_TILE = { w: 0.38, h: 0.38, d: 0.22, r: 0.035 } as const;
 
 export function getEarTileGeometry(): RoundedBoxGeometry {
-  return getRoundedBoxGeometry(EAR_TILE.w, EAR_TILE.h, EAR_TILE.d, EAR_TILE.r);
+  return cached("earTile", () =>
+    bakeVerticalGradient(
+      new RoundedBoxGeometry(EAR_TILE.w, EAR_TILE.h, EAR_TILE.d, 5, EAR_TILE.r),
+      -EAR_TILE.h / 2,
+      EAR_TILE.h / 2,
+      TILE_SHADE.bottom,
+      TILE_SHADE.top,
+    ) as RoundedBoxGeometry,
+  );
 }
 
 export function getSideTileGeometry(): RoundedBoxGeometry {
-  return getRoundedBoxGeometry(SIDE_TILE.w, SIDE_TILE.h, SIDE_TILE.d, SIDE_TILE.r);
+  return cached("sideTile", () =>
+    bakeVerticalGradient(
+      new RoundedBoxGeometry(SIDE_TILE.w, SIDE_TILE.h, SIDE_TILE.d, 5, SIDE_TILE.r),
+      -SIDE_TILE.h / 2,
+      SIDE_TILE.h / 2,
+      TILE_SHADE.bottom,
+      TILE_SHADE.top,
+    ) as RoundedBoxGeometry,
+  );
 }
 
-/** Unit sphere shared by all ellipsoid parts (arms, feet, eyes, cheeks…). */
+/**
+ * Unit sphere shared by all ellipsoid parts (arms, feet, eyes, cheeks…). It
+ * carries the limb gradient as vertex colours; materials that don't enable
+ * `vertexColors` (eyes, cheeks, highlights) ignore it.
+ */
 export function getUnitSphereGeometry(): THREE.SphereGeometry {
-  return cached("sphere:unit", () => new THREE.SphereGeometry(1, 48, 32));
+  return cached("sphere:unit", () =>
+    bakeVerticalGradient(new THREE.SphereGeometry(1, 48, 32), -1, 1, LIMB_SHADE.bottom, LIMB_SHADE.top) as THREE.SphereGeometry,
+  );
 }
 
 /** Closed-eye arc: tube along a quadratic bezier, apex at y ≈ 0.065. */
