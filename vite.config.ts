@@ -21,6 +21,8 @@ export default defineConfig({
     },
     sourcemap: true,
     target: "es2022",
+    // Keep dist/filly-mascot.glb (written by `npm run export:glb`) when rebuilding the JS.
+    emptyOutDir: false,
     rollupOptions: {
       external: (id) =>
         /^(react|react-dom|react\/jsx-runtime|three|@react-three\/fiber)($|\/)/.test(id),
