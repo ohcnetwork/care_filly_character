@@ -5,7 +5,13 @@
 import * as THREE from "three";
 import { PALETTE } from "../core/palette";
 import { createCanvasSurface, type CanvasSurface } from "./canvas";
-import { getEyeArcGeometry, getMouthPlaneGeometry, getUnitSphereGeometry, MOUTH_PLANE } from "./geometry";
+import {
+  getBrowGeometry,
+  getEyeArcGeometry,
+  getMouthPlaneGeometry,
+  getUnitSphereGeometry,
+  MOUTH_PLANE,
+} from "./geometry";
 import type { FillyMaterials } from "./materials";
 import {
   computeMouthShape,
@@ -25,31 +31,100 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
 
 /** Eye layout constants (body units). */
 export const EYE = {
-  /** Measured from the sheet: eyes at ≈ (±0.31, +0.03), r ≈ 0.15, bulging past the plate. */
+  /** Sheet v2: eyes at ≈ (±0.31, +0.17), r ≈ 0.16, bulging past the plate. */
   x: 0.31,
-  y: 0.04,
-  z: 0.85,
-  radius: 0.15,
-  /** Gaze displacement at lookX/lookY = ±1. */
-  lookX: 0.035,
-  lookY: 0.03,
+  y: 0.17,
+  z: 0.82,
+  radius: 0.175,
+  /** Gaze rotation (radians) at lookX/lookY = ±1. */
+  lookYaw: 0.38,
+  lookPitch: 0.32,
   /** Ball hidden below this openness; arc fully in by 0.05 → 0.25. */
   hideBelow: 0.08,
-  browTilt: 0.25,
+  /** Brow tilt at brow = ±1 (− = inner ends up / worried). */
+  browTilt: 0.45,
+  /** Brow rest height above the eye centre and extra lift when eyes widen. */
+  browY: 0.225,
+  browLift: 0.25,
 } as const;
 
-/** One eye: socket group → lid (squashes) → ball (gaze) + fixed highlights; plus the closed arc. */
+/** Iris texture: the +z hemisphere of a SphereGeometry sits at u = 0.25, v = 0.5. */
+const IRIS_CANVAS = { w: 256, h: 128 } as const;
+/** Angular radius of the iris (≈ 49°) and pupil (≈ 17°) on the eyeball. */
+const IRIS_ANGLE = 0.92;
+const PUPIL_ANGLE = 0.33;
+
+/**
+ * Paint the eyeball texture: dark sclera everywhere, a green radial-gradient
+ * iris with a dark pupil on the front hemisphere. Returns null without a DOM.
+ */
+export function createEyeTexture(): THREE.CanvasTexture | null {
+  const surface = createCanvasSurface(IRIS_CANVAS.w, IRIS_CANVAS.h);
+  if (!surface) return null;
+  const { ctx, texture } = surface;
+  const W = IRIS_CANVAS.w;
+  const H = IRIS_CANVAS.h;
+  const cx = W * 0.25;
+  const cy = H * 0.5;
+  // Angular radius → texture pixels (u spans 2π, v spans π).
+  const rIris = (IRIS_ANGLE / (2 * Math.PI)) * W; // == (IRIS_ANGLE / π) * H for a 2:1 canvas
+  const rPupil = (PUPIL_ANGLE / (2 * Math.PI)) * W;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = PALETTE.eye;
+  ctx.fillRect(0, 0, W, H);
+
+  // Iris: bright centre fading to a darker rim, with a thin dark edge.
+  const grad = ctx.createRadialGradient(cx, cy - rIris * 0.15, rIris * 0.1, cx, cy, rIris);
+  grad.addColorStop(0, PALETTE.eyeIris);
+  grad.addColorStop(0.62, PALETTE.eyeIris);
+  grad.addColorStop(0.92, PALETTE.eyeIrisEdge);
+  grad.addColorStop(1, PALETTE.eye);
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rIris, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pupil.
+  ctx.fillStyle = PALETTE.eyePupil;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rPupil, 0, Math.PI * 2);
+  ctx.fill();
+
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Attach the iris texture to the shared eye material (once per material set).
+ * The material colour becomes white so the map shows unmodified; without a
+ * DOM the eye stays a plain dark glossy sphere. Returns the texture to dispose.
+ */
+export function ensureEyeTexture(materials: FillyMaterials): THREE.CanvasTexture | null {
+  if (materials.eye.map) return null;
+  const texture = createEyeTexture();
+  if (!texture) return null;
+  materials.eye.map = texture;
+  materials.eye.color.set("#ffffff");
+  materials.eye.needsUpdate = true;
+  return texture;
+}
+
+/** One eye: socket group → lid (squashes) → ball (gaze) + fixed highlights; plus arc and brow. */
 export interface EyeRig {
-  /** Socket: positioned on the face, scaled by eyeScale, tilted by brow. */
+  /** Socket: positioned on the face, scaled by eyeScale. */
   group: THREE.Group;
   /** Scales in y with openness; holds ball + highlights. */
   lid: THREE.Group;
-  /** Glossy black sphere; translated by gaze. */
+  /** Glossy textured sphere; rotated by gaze. */
   ball: THREE.Mesh;
   highlights: [THREE.Mesh, THREE.Mesh];
   /** Closed-eye arc; scale.y = eyeArc, opacity fades in as the eye closes. */
   arc: THREE.Mesh;
   arcMaterial: THREE.MeshStandardMaterial;
+  /** Eyebrow arc above the eye; tilted by brow, lifted when the eye widens. */
+  brow: THREE.Mesh;
   /** −1 = viewer's left (x < 0), +1 = viewer's right. */
   side: -1 | 1;
 }
@@ -73,12 +148,12 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   // Both highlights sit upper-left / lower-right on BOTH eyes (fixed to view).
   const big = new THREE.Mesh(unit, materials.eyeHighlight);
   big.name = "highlightBig";
-  big.scale.set(0.054, 0.046, 0.054); // slightly oval, like the sheet
-  big.position.set(-0.05, 0.055, 0.125);
+  big.scale.set(0.054, 0.048, 0.054); // slightly oval, like the sheet
+  big.position.set(-0.06, 0.065, 0.15);
   const small = new THREE.Mesh(unit, materials.eyeHighlight);
   small.name = "highlightSmall";
-  small.scale.setScalar(0.02);
-  small.position.set(0.055, -0.045, 0.13);
+  small.scale.setScalar(0.022);
+  small.position.set(0.065, -0.055, 0.155);
   lid.add(big, small);
 
   const arcMaterial = materials.eyeLid.clone();
@@ -90,7 +165,12 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   arc.visible = false;
   group.add(arc);
 
-  return { group, lid, ball, highlights: [big, small], arc, arcMaterial, side };
+  const brow = new THREE.Mesh(getBrowGeometry(), materials.brow);
+  brow.name = "brow";
+  brow.position.set(0, EYE.browY, -0.02);
+  group.add(brow);
+
+  return { group, lid, ball, highlights: [big, small], arc, arcMaterial, brow, side };
 }
 
 /** Apply eye pose params. Allocation-free. */
@@ -105,14 +185,14 @@ export function applyEyePose(
 ): void {
   const openness = clamp(open, 0, 1);
   eye.group.scale.setScalar(scale);
-  eye.group.rotation.z = eye.side * brow * EYE.browTilt;
 
   // Lid squash: ball + highlights flatten together; hide when nearly shut.
   const lidVisible = openness > EYE.hideBelow;
   eye.lid.visible = lidVisible;
   eye.lid.scale.y = Math.max(openness, 0.02);
 
-  eye.ball.position.set(lookX * EYE.lookX, lookY * EYE.lookY, 0);
+  // Gaze: rotate the textured ball (iris + pupil travel on the sphere).
+  eye.ball.rotation.set(-lookY * EYE.lookPitch, lookX * EYE.lookYaw, 0);
 
   // Closed arc: +1 happy "^", −1 sleepy "︶"; never fully flat.
   let arcScale = clamp(arc, -1, 1);
@@ -121,6 +201,10 @@ export function applyEyePose(
   const arcOpacity = 1 - smoothstep(0.05, 0.25, openness);
   eye.arcMaterial.opacity = arcOpacity;
   eye.arc.visible = arcOpacity > 0.01;
+
+  // Brow: tilt (− = inner end up, worried) and lift when the eyes widen.
+  eye.brow.rotation.z = eye.side * clamp(brow, -1, 1) * EYE.browTilt;
+  eye.brow.position.y = EYE.browY + EYE.browLift * Math.max(0, scale - 1);
 }
 
 // ── cheeks ──────────────────────────────────────────────────────────────────
@@ -141,8 +225,8 @@ export function buildCheek(side: -1 | 1, materials: FillyMaterials): THREE.Mesh 
   const cheek = new THREE.Mesh(getUnitSphereGeometry(), materials.cheek);
   cheek.name = side < 0 ? "cheekL" : "cheekR";
   // Sheet: pink ovals ≈ 0.16 × 0.12 at (±0.41, −0.21), just under the eyes.
-  cheek.scale.set(0.11, 0.076, 0.02);
-  placeOnSphere(cheek, side * 0.41, -0.21, 0.8, 0.945);
+  cheek.scale.set(0.1, 0.07, 0.02);
+  placeOnSphere(cheek, side * 0.4, -0.05, 0.8, 0.945);
   return cheek;
 }
 
@@ -229,7 +313,7 @@ export class MouthDecal {
     this.mesh.name = "mouth";
     this.mesh.renderOrder = 1;
     // Sheet: mouth centred at y ≈ −0.11, at the bar/stem junction.
-    placeOnSphere(this.mesh, 0, -0.12, 0.912, 0.95);
+    placeOnSphere(this.mesh, 0, -0.07, 0.912, 0.95);
     // Without a DOM there is nothing to paint: hide the bare plane.
     this.mesh.visible = this.surface !== null;
   }

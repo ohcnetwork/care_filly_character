@@ -157,13 +157,14 @@ describe("FillyAnimator — happy", () => {
     expect(p.bodyY).toBeGreaterThan(0.03);
   });
 
-  it("has a wide open smile, eyes open, full cheeks", () => {
+  it("has a wide open smile, happy closed ^^ eyes, full cheeks", () => {
     const a = new FillyAnimator({ seed: 1, autoBlink: false });
     a.setState("happy");
     const p = advance(a, 2);
     expect(p.mouthOpen).toBeGreaterThan(0.7);
     expect(p.mouthSmile).toBeCloseTo(1, 1);
-    expect(p.eyeOpenL).toBeCloseTo(1, 1);
+    expect(p.eyeOpenL).toBeLessThan(0.05);
+    expect(p.eyeArc).toBeCloseTo(1, 1);
     expect(p.cheek).toBeCloseTo(1, 1);
   });
 });
@@ -217,7 +218,9 @@ describe("FillyAnimator — sleepy", () => {
     expect(p.zzz).toBeCloseTo(1, 2);
     expect(p.earL).toBeLessThan(-0.1);
     expect(p.bodyPitch).toBeGreaterThan(0.02);
-    expect(p.mouthRound).toBeGreaterThan(0.9);
+    // Sheet v2 sleepy face: a small content closed smile (no "o").
+    expect(p.mouthOpen).toBeLessThan(0.05);
+    expect(p.mouthSmile).toBeGreaterThan(0.3);
   });
 
   it("breathes slowly and deeply", () => {

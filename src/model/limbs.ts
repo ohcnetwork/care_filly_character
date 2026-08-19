@@ -16,29 +16,34 @@ import type { FillyMaterials } from "./materials";
  * into the sphere so only the front ~0.1 protrudes.
  */
 export const EAR_ANCHOR = {
-  x: 0.405,
-  base: { y: 0.34 },
-  orient: { y: 0.62 },
-  /** Mostly toward +z: the slabs stand upright in front of the dome (sheet). */
-  face: 0.6,
+  x: 0.37,
+  /** Sheet v2: tall tabs rising from the plate's top bar well above the head. */
+  base: { y: 0.58 },
+  orient: { y: 0.8 },
+  /** Mostly toward +z: upright tabs in front of the dome, a hint of back-lean. */
+  face: 0.86,
   splay: 0.0,
-  bury: 0.11,
+  bury: 0.09,
 } as const;
-/** Side tiles: big rounded squares centred at (±0.74, +0.08), abutting the bar ends. */
-export const SIDE_ANCHOR = { x: 0.75, y: 0.14, z: 0.65, depthOffset: -0.05, face: 0.8 } as const;
+/**
+ * Side tiles: big rounded squares butting the bar ends. Positioned explicitly
+ * (not on the sphere surface) so the inner half isn't swallowed by the body;
+ * the back stays buried, the front face sits ≈0.1 proud of the plate rim.
+ */
+export const SIDE_ANCHOR = { x: 0.77, y: 0.24, z: 0.74, face: 0.9 } as const;
 /** Arms hang low on the sides (hand centre ≈ (±0.88, −0.47)). */
-export const SHOULDER = { x: 0.8, y: -0.24, z: 0.25 } as const;
+export const SHOULDER = { x: 0.8, y: -0.2, z: 0.25 } as const;
 export const HAND_REST = { x: 0.08, y: -0.17, z: 0.02 } as const;
 /** Hand-to-chin world position for the viewer's-left arm (THINKING): just left of the mouth. */
-export const HAND_CHIN = { x: -0.42, y: -0.38, z: 0.88 } as const;
+export const HAND_CHIN = { x: -0.38, y: -0.3, z: 0.88 } as const;
 export const HAND_SCALE = { x: 0.18, y: 0.215, z: 0.17 } as const;
-export const FOOT = { x: 0.41, y: -0.84, z: 0.5, sx: 0.19, sy: 0.16, sz: 0.22 } as const;
+export const FOOT = { x: 0.45, y: -0.85, z: 0.48, sx: 0.2, sy: 0.15, sz: 0.22 } as const;
 /**
  * Ear perk: + tips the tile upright/forward (about local x) with a little
  * outward swing (about local z); − lies it back (droop) with a touch of
  * inward swing so the two ears never collide.
  */
-export const EAR_TILT_X = 0.85;
+export const EAR_TILT_X = 0.5;
 export const EAR_SWING_OUT = 0.15;
 export const EAR_SWING_IN = 0.25;
 
@@ -128,14 +133,10 @@ export function applyEarPose(ear: EarRig, angle: number): void {
 export function buildSideTile(side: -1 | 1, materials: FillyMaterials): THREE.Mesh {
   const tile = new THREE.Mesh(getSideTileGeometry(), materials.tile);
   tile.name = side < 0 ? "sideL" : "sideR";
-  placeSurfaceFrame(
-    tile,
-    side * SIDE_ANCHOR.x,
-    SIDE_ANCHOR.y,
-    SIDE_ANCHOR.z,
-    1 + SIDE_ANCHOR.depthOffset,
-    SIDE_ANCHOR.face,
-  );
+  const x = side * SIDE_ANCHOR.x;
+  // Orientation from the (blended) direction; position is the raw anchor point.
+  placeSurfaceFrame(tile, x, SIDE_ANCHOR.y, SIDE_ANCHOR.z, 1, SIDE_ANCHOR.face);
+  tile.position.set(x, SIDE_ANCHOR.y, SIDE_ANCHOR.z);
   return tile;
 }
 

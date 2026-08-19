@@ -12,7 +12,8 @@
 The geometry is **procedural** (no model files to load, no network fetches — CARE deployments
 may be offline): a mint sphere with a CSG-recessed plus/cross face plate, raised ear and side
 tiles, glossy eyes, a canvas-painted mouth and state decorations (zZ, thought bubbles, sound
-waves, sparks). The look is tuned against `reference/animation-states-sheet.png`.
+waves, sparks). The look is tuned against the CARE mascot design sheet (v2 — green-iris eyes,
+brows, emerald plate; `reference/animation-states-sheet.png` is the earlier v1 sheet).
 
 ---
 

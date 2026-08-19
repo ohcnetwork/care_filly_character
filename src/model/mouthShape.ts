@@ -151,7 +151,7 @@ export function computeMouthShape(params: MouthParams, out: MouthShape = createM
   out.closed = closed;
   out.width = hw * 2;
   out.height = closed ? 0 : Math.max(tY - bY, 0);
-  out.lineWidth = closed ? 0.018 : 0.012;
+  out.lineWidth = closed ? 0.022 : 0.012;
 
   // Tongue: sits in the bottom of the open smile, hidden for round "o".
   // Round "o" mouths keep a hint of tongue (the sheet's surprised face has one).

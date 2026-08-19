@@ -19,17 +19,17 @@ export const PLATE_RADIUS = 0.93;
 
 /** Rounded plus ("cross") outline of the face plate, in the XY plane. */
 export const PLUS_SHAPE = {
-  /** Vertical bar half-width (measured from the sheet: stem ≈ ±0.17). */
-  vHalfWidth: 0.18,
-  /** Stem runs almost to the feet… */
-  vBottom: -0.7,
-  /** …and up between the ear tiles. */
-  vTop: 0.46,
+  /** Vertical bar half-width (sheet v2: stem ≈ ±0.2). */
+  vHalfWidth: 0.2,
+  /** Stem runs down to the lower third… */
+  vBottom: -0.62,
+  /** …and up between the ear tiles to about their mid-height (dark notch). */
+  vTop: 0.82,
   /** Horizontal bar half-width (ends where the side tiles start). */
-  hHalfWidth: 0.56,
-  /** Bar sits high: eyes in it, mouth at the bar/stem junction. */
-  hBottom: -0.3,
-  hTop: 0.38,
+  hHalfWidth: 0.54,
+  /** Bar sits high: eyes in its upper half, mouth near the centre line. */
+  hBottom: -0.22,
+  hTop: 0.52,
   cornerRadius: 0.06,
 } as const;
 
@@ -224,9 +224,9 @@ export function getRoundedBoxGeometry(
  * Ear tile dimensions (width, height, depth, corner radius). Wide upright
  * slabs that sit flush against the plus stem (inner edge ≈ ±0.18, outer ≈ ±0.64).
  */
-export const EAR_TILE = { w: 0.48, h: 0.64, d: 0.3, r: 0.17 } as const;
+export const EAR_TILE = { w: 0.37, h: 0.54, d: 0.26, r: 0.14 } as const;
 /** Side tile dimensions — large rounded squares butting the bar ends. */
-export const SIDE_TILE = { w: 0.42, h: 0.52, d: 0.3, r: 0.16 } as const;
+export const SIDE_TILE = { w: 0.42, h: 0.52, d: 0.3, r: 0.15 } as const;
 
 export function getEarTileGeometry(): RoundedBoxGeometry {
   return getRoundedBoxGeometry(EAR_TILE.w, EAR_TILE.h, EAR_TILE.d, EAR_TILE.r);
@@ -250,6 +250,18 @@ export function getEyeArcGeometry(): THREE.TubeGeometry {
       new THREE.Vector3(0.12, 0, 0),
     );
     return new THREE.TubeGeometry(curve, 24, 0.024, 10, false);
+  });
+}
+
+/** Eyebrow: a short, thin "︵" arc (apex ≈ 0.025 above its ends). */
+export function getBrowGeometry(): THREE.TubeGeometry {
+  return cached("brow", () => {
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(-0.07, 0, 0),
+      new THREE.Vector3(0, 0.045, 0),
+      new THREE.Vector3(0.07, 0, 0),
+    );
+    return new THREE.TubeGeometry(curve, 16, 0.011, 8, false);
   });
 }
 

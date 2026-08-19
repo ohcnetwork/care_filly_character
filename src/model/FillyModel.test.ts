@@ -119,8 +119,9 @@ describe("FillyModel", () => {
     model.applyPose(createPose({ eyeLookX: 1, eyeLookY: -1 }), 0);
     const ball = eyeL.getObjectByName("ball")!;
     const hl = eyeL.getObjectByName("highlightBig")!;
-    expect(ball.position.x).toBeGreaterThan(0);
-    expect(hl.position.x).toBeCloseTo(-0.05);
+    // Gaze rotates the textured ball (look right → positive yaw); highlights stay put.
+    expect(ball.rotation.y).toBeGreaterThan(0);
+    expect(hl.position.x).toBeCloseTo(-0.055);
 
     // Decorations toggle visibility with their master opacity.
     expect(model.parts.decorations.getObjectByName("zzz")!.visible).toBe(false);

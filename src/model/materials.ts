@@ -21,6 +21,8 @@ export interface FillyMaterials {
   eyeHighlight: THREE.MeshBasicMaterial;
   /** Closed-eye arcs (blink / happy / sleepy). Cloned per eye for opacity. */
   eyeLid: THREE.MeshStandardMaterial;
+  /** Eyebrow arcs. */
+  brow: THREE.MeshStandardMaterial;
   /** Blush discs. */
   cheek: THREE.MeshStandardMaterial;
   /** Mouth decal (canvas texture is attached per instance). */
@@ -80,12 +82,18 @@ export function buildFillyMaterials(): FillyMaterials {
     opacity: 0,
     name: "filly-eyeLid",
   });
+  const brow = new THREE.MeshStandardMaterial({
+    color: PALETTE.brow,
+    roughness: 0.7,
+    metalness: 0,
+    name: "filly-brow",
+  });
   // Blush reads as flat solid pink on the sheet: mostly self-lit so the scene
   // lighting and tone mapping cannot grey it out.
   const cheek = new THREE.MeshStandardMaterial({
     color: PALETTE.cheek,
     emissive: PALETTE.cheek,
-    emissiveIntensity: 0.8,
+    emissiveIntensity: 1.0,
     roughness: MATERIALS.cheek.roughness,
     metalness: 0,
     transparent: true,
@@ -129,6 +137,7 @@ export function buildFillyMaterials(): FillyMaterials {
     eye: toyMaterial(PALETTE.eye, MATERIALS.eye, "filly-eye"),
     eyeHighlight,
     eyeLid,
+    brow,
     cheek,
     mouth,
     accent,

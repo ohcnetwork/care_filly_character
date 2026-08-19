@@ -14,7 +14,7 @@
 import * as THREE from "three";
 import { POSE_BOUNDS, type FillyPose, type PoseKey } from "../core/types";
 import { FillyDecorations } from "./decorations";
-import { applyEyePose, buildCheek, buildEye, MouthDecal, type EyeRig } from "./face";
+import { applyEyePose, buildCheek, buildEye, ensureEyeTexture, MouthDecal, type EyeRig } from "./face";
 import { getBodyGeometry } from "./geometry";
 import {
   applyArmPose,
@@ -92,6 +92,7 @@ export class FillyModel extends THREE.Group {
   private readonly armR: ArmRig;
   private readonly eyeL: EyeRig;
   private readonly eyeR: EyeRig;
+  private readonly eyeTexture: THREE.CanvasTexture | null;
   private readonly mouth: MouthDecal;
   private readonly shadow: ContactShadow;
   private readonly decorations: FillyDecorations;
@@ -155,7 +156,9 @@ export class FillyModel extends THREE.Group {
       footR,
     );
 
-    // Face.
+    // Face. The iris texture is attached to the shared eye material once per
+    // material set (null without a DOM → plain dark glossy eyes).
+    this.eyeTexture = ensureEyeTexture(mats);
     this.eyeL = buildEye(-1, mats);
     this.eyeR = buildEye(1, mats);
     const cheekL = buildCheek(-1, mats);
@@ -250,7 +253,7 @@ export class FillyModel extends THREE.Group {
 
     const cheek = clampKey("cheek", pose.cheek);
     // Blush never fully disappears below the idle level; it reads as solid pink at 1.
-    this.materials.cheek.opacity = (0.25 + 0.75 * cheek) * CHEEK_MAX_OPACITY;
+    this.materials.cheek.opacity = (0.45 + 0.55 * cheek) * CHEEK_MAX_OPACITY;
     parts.cheekL.visible = parts.cheekR.visible = cheek > 0.01;
 
     this.mouth.update(
@@ -284,6 +287,11 @@ export class FillyModel extends THREE.Group {
     this.decorations.dispose();
     this.eyeL.arcMaterial.dispose();
     this.eyeR.arcMaterial.dispose();
+    if (this.eyeTexture) {
+      // Only detach from materials we own; overrides keep whatever they had.
+      if (this.ownsMaterials.has(this.materials.eye)) this.materials.eye.map = null;
+      this.eyeTexture.dispose();
+    }
     for (const m of this.ownsMaterials) m.dispose();
     this.ownsMaterials.clear();
     this.removeFromParent();

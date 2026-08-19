@@ -3,6 +3,16 @@
 Date: 2026-08-19
 Status: approved-by-default (autonomous session; assumptions listed below)
 
+> **Reference v2 (2026-08-19, later the same day):** the user supplied a second design sheet
+> (in chat; not yet in `reference/`) and asked for a much closer match. It differs from the
+> first sheet in: cooler, more saturated greens (dark emerald plate `#3f8b50`, medium-green
+> tiles/limbs, near-white mint body); big glossy eyes with a **green iris + dark pupil** and
+> small **eyebrows**; taller ear tabs with the plate stem running up between them; the face
+> plate sitting higher (eyes ≈ +0.17 R); a **closed smile** for idle/blink/listening/sleepy;
+> happy with closed "^ ^" eyes; arm raises in listening/talking/happy/surprised. The anatomy
+> table below describes v1; `src/core/palette.ts`, `src/model/{geometry,limbs,face}.ts` and
+> `src/animation/states.ts` now encode v2 and are the source of truth.
+
 ## 1. Goal
 
 Turn the CARE mascot design sheet (`71e53c69-….png` — 8 animation states:
