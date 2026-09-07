@@ -10,8 +10,8 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
-import { PALETTE } from "../core/palette";
 import type { FillyMaterialKey } from "./materials";
+import { PALETTE } from "../core/palette";
 import { buildPlateDecalGeometry } from "./plateFallback";
 import { MASCOT_FACE, mascotFaceSdf } from "./mascotShape";
 
@@ -255,11 +255,12 @@ function buildBodyCSG(): BodyGeometry {
 
   const shape = buildRoundedPlusShape();
   const plusGeo = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.8,
+    depth: 1.1,
     bevelEnabled: false,
     curveSegments: 6,
   });
-  plusGeo.translate(0, 0, 0.3); // spans z 0.3 → 1.1 (through the oval's front)
+  // The taller crown lobes reach the shell's shallow upper corners too.
+  plusGeo.translate(0, 0, 0.01);
   const plusBrush = new Brush(plusGeo, bodyMat);
   const innerGeo = new THREE.SphereGeometry(
     PLATE_RADIUS,
@@ -295,6 +296,49 @@ function buildBodyCSG(): BodyGeometry {
   );
 
   const geometry = result.geometry;
+  // The cut walls beneath the two crown tabs belong to the green insert.
+  // Leave the outer shell and the centre of the cream notch untouched.
+  const plateSlot = slots.indexOf("plate");
+  if (plateSlot >= 0) {
+    const positions = geometry.getAttribute("position");
+    const normals = geometry.getAttribute("normal");
+    const index = geometry.index;
+    const trianglesByMaterial = slots.map(() => [] as number[]);
+    for (const group of geometry.groups) {
+      const originalSlot = group.materialIndex ?? 0;
+      for (let i = group.start; i < group.start + group.count; i += 3) {
+        let materialIndex = originalSlot;
+        if (slots[originalSlot] === "body") {
+          let x = 0, y = 0, z = 0;
+          let wall = true;
+          for (let corner = 0; corner < 3; corner++) {
+            const vertex = index ? index.getX(i + corner) : i + corner;
+            x += positions.getX(vertex) / 3;
+            y += positions.getY(vertex) / 3;
+            z += positions.getZ(vertex) / 3;
+            wall &&= Math.abs(normals.getZ(vertex)) < 0.2;
+          }
+          if (wall && Math.abs(x) > 0.14 && Math.abs(x) < 0.57 &&
+            y > 0.54 && y < 0.70 && z > 0) {
+            materialIndex = plateSlot;
+          }
+        }
+        const triangles = trianglesByMaterial[materialIndex];
+        for (let corner = 0; corner < 3; corner++) {
+          triangles.push(index ? index.getX(i + corner) : i + corner);
+        }
+      }
+    }
+    // Keep one draw group per material instead of splitting at every rim face.
+    geometry.setIndex(trianglesByMaterial.flat());
+    geometry.clearGroups();
+    let start = 0;
+    for (let materialIndex = 0; materialIndex < trianglesByMaterial.length; materialIndex++) {
+      const count = trianglesByMaterial[materialIndex].length;
+      if (count > 0) geometry.addGroup(start, count, materialIndex);
+      start += count;
+    }
+  }
   geometry.computeBoundingSphere();
   geometry.computeBoundingBox();
   if (!geometry.getAttribute("position") || slots.length === 0) {
@@ -444,79 +488,52 @@ function buildPixelCushion(tile: { w: number; h: number; d: number; r: number })
 }
 
 /**
- * The lower cushion rolls into the face instead of ending in a rounded cap.
- * Work in the ear's rest frame so each root meets the curved insert exactly;
- * its buried end stays beneath the face as the existing rig bends the ear.
+ * A crown tab has a curved lower lip and a broad back rooted in the head.
+ * Its front keeps the reference's padded shape; the rear volume follows the
+ * shell instead of leaving a narrow connector visible in profile.
  */
 export function getEarTileGeometry(restFrame?: THREE.Matrix4): THREE.BufferGeometry {
   if (!restFrame) return cached("earCushion", () => buildPixelCushion(EAR_TILE));
-  const key = `earCushion:root:${restFrame.elements.join(":")}`;
+  const key = `earCushion:crown:${restFrame.elements.join(":")}`;
   return cached(key, () => {
     const geometry = buildPixelCushion(EAR_TILE);
     const positions = geometry.getAttribute("position");
     const colors = geometry.getAttribute("color");
-    const cushionNormals = geometry.getAttribute("normal").clone();
+    const faceColor = new THREE.Color(PALETTE.plate);
+    const tileColor = new THREE.Color(PALETTE.tile);
+    const seamColor = [faceColor.r / tileColor.r * 0.97, faceColor.g / tileColor.g, faceColor.b / tileColor.b * 0.93];
     const inverse = restFrame.clone().invert();
     const point = new THREE.Vector3();
     const world = new THREE.Vector3();
-    const normalBlend = new Float32Array(positions.count);
-    // Vertex colours multiply the material's linear albedo.
-    const faceColor = new THREE.Color(PALETTE.plate);
-    const tileColor = new THREE.Color(PALETTE.tile);
-    const rootColor = new THREE.Color(
-      faceColor.r / tileColor.r * 0.97,
-      faceColor.g / tileColor.g,
-      faceColor.b / tileColor.b * 0.93,
-    );
     for (let i = 0; i < positions.count; i++) {
       point.fromBufferAttribute(positions, i);
       const height = point.y + EAR_TILE.h / 2;
-      const root = 1 - smooth01(0, 0.23, height);
-      const front = smooth01(-EAR_TILE.d * 0.35, EAR_TILE.d * 0.25, point.z);
-      normalBlend[i] = (1 - smooth01(0.12, 0.36, height)) * front;
-      point.y -= 0.055 * root;
+      const seam = (1 - smooth01(0, 0.055, height)) * smooth01(-0.10, 0, point.z);
+      colors.setXYZ(i,
+        THREE.MathUtils.lerp(colors.getX(i), seamColor[0], seam),
+        THREE.MathUtils.lerp(colors.getY(i), seamColor[1], seam),
+        THREE.MathUtils.lerp(colors.getZ(i), seamColor[2], seam),
+      );
+      const across = Math.min(1, Math.abs(point.x) / (EAR_TILE.w / 2));
+      const front = smooth01(-0.02, 0.06, point.z);
+      const lip = (1 - smooth01(0, 0.16, height)) * front;
+      const arch = 0.06 - 0.08 * smooth01(0.5, 1, across);
+      point.y += arch * lip;
+      // Roll only the lower edge back into the insert, like the mint hood
+      // around each green face lobe in the reference.
+      point.z -= 0.035 * (1 - smooth01(0, 0.08, height)) * front;
       world.copy(point).applyMatrix4(restFrame);
-      const insideFace = smooth01(0, 0.045, -mascotFaceSdf(world.x, world.y));
-      const surface = THREE.MathUtils.lerp(
-        bodyZ(world.x, world.y) + 0.006,
-        plateZ(world.x, world.y) - 0.008,
-        insideFace,
-      );
-      world.z = THREE.MathUtils.lerp(
-        world.z, surface, root * front,
-      );
-      // Cover the pale shell until the root reaches the recessed green face.
-      if (height < 0.3) {
-        world.z = THREE.MathUtils.lerp(world.z, Math.max(world.z, surface), front);
-      }
+      const back = 1 - smooth01(-0.065, 0.045, point.z);
+      const root = 1 - smooth01(0.21, 0.43, height);
+      // Round the rear haunch down into the crown so the profile has a
+      // padded socket rather than a high triangular web above the shell.
+      world.y -= 0.11 * back * root * smooth01(0.06, 0.2, height);
+      const tuckedBack = Math.min(world.z, Math.max(0.22, bodyZ(world.x, world.y) - 0.07));
+      world.z = THREE.MathUtils.lerp(world.z, tuckedBack, back * root);
       point.copy(world).applyMatrix4(inverse);
       positions.setXYZ(i, point.x, point.y, point.z);
-      const tint = 1 - smooth01(0.01, 0.32, height);
-      colors.setXYZ(i,
-        THREE.MathUtils.lerp(colors.getX(i), rootColor.r, tint),
-        THREE.MathUtils.lerp(colors.getY(i), rootColor.g, tint),
-        THREE.MathUtils.lerp(colors.getZ(i), rootColor.b, tint),
-      );
     }
     geometry.computeVertexNormals();
-    // Continue the insert's soft lighting across the flexible join. A short
-    // geometric fillet otherwise produces a dark band on its downward slope.
-    const normals = geometry.getAttribute("normal");
-    const normal = new THREE.Vector3();
-    const surfaceNormal = new THREE.Vector3();
-    const step = 0.002;
-    for (let i = 0; i < positions.count; i++) {
-      if (normalBlend[i] === 0) continue;
-      world.fromBufferAttribute(positions, i).applyMatrix4(restFrame);
-      // Continue the crown's tangent above the shell instead of sampling its
-      // silhouette, where the ellipsoid derivative becomes discontinuous.
-      world.y = Math.min(world.y, PLUS_SHAPE.hTop);
-      const dx = (bodyZ(world.x + step, world.y) - bodyZ(world.x - step, world.y)) / (2 * step);
-      const dy = (bodyZ(world.x, world.y + step) - bodyZ(world.x, world.y - step)) / (2 * step);
-      surfaceNormal.set(-dx, -dy, 1).normalize().transformDirection(inverse);
-      normal.fromBufferAttribute(cushionNormals, i).lerp(surfaceNormal, normalBlend[i]).normalize();
-      normals.setXYZ(i, normal.x, normal.y, normal.z);
-    }
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
     return geometry;

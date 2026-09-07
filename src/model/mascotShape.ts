@@ -7,10 +7,10 @@
 export const MASCOT_FACE = Object.freeze({
   vHalfWidth: 0.185,
   vBottom: -0.55,
-  vTop: 0.61,
+  vTop: 0.68,
   hHalfWidth: 0.55,
   hBottom: -0.29,
-  hTop: 0.61,
+  hTop: 0.68,
   notchHalfWidth: 0.15,
   notchBottom: 0.49,
   cornerRadius: 0.075,

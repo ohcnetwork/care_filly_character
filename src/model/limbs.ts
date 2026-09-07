@@ -28,11 +28,11 @@ import type { FillyMaterials } from "./materials";
  */
 export const EAR_ANCHOR = {
   x: 0.34,
-  baseY: MASCOT_FACE.hTop - 0.03,
+  baseY: MASCOT_FACE.hTop - 0.10,
   orientY: 0.78,
-  face: 1,
+  face: 0.65,
   splay: 0.035,
-  bury: 0.065,
+  bury: 0.045,
   depthOffset: 0.035,
 } as const;
 /** Side tiles: rounded cushions butting the bar ends and following the shell. */
