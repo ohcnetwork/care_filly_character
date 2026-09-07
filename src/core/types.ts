@@ -17,7 +17,10 @@ export const FILLY_STATES = [
 export type FillyState = (typeof FILLY_STATES)[number];
 
 export function isFillyState(value: unknown): value is FillyState {
-  return typeof value === "string" && (FILLY_STATES as readonly string[]).includes(value);
+  return (
+    typeof value === "string" &&
+    (FILLY_STATES as readonly string[]).includes(value)
+  );
 }
 
 /**
@@ -63,6 +66,8 @@ export interface FillyPose {
   eyeLookY: number;
   /** Uniform eye scale; >1 = wide (surprised). */
   eyeScale: number;
+  /** 0 = glossy black jewel eye, 1 = white sclera with a small pupil (thinking). */
+  eyeWhite: number;
   /** Brow tilt hint (−1 worried/inner-up .. +1 angry/inner-down); subtle lid rotation. */
   browL: number;
   browR: number;
@@ -108,13 +113,14 @@ export const DEFAULT_POSE: Readonly<FillyPose> = Object.freeze({
   eyeLookX: 0,
   eyeLookY: 0,
   eyeScale: 1,
+  eyeWhite: 0,
   browL: 0,
   browR: 0,
-  mouthOpen: 0.6,
+  mouthOpen: 0.42,
   mouthWide: 1,
   mouthSmile: 0.8,
-  mouthRound: 0,
-  cheek: 0.8,
+  mouthRound: 0.15,
+  cheek: 0.95,
   zzz: 0,
   bubbles: 0,
   waves: 0,
@@ -129,36 +135,38 @@ export function createPose(overrides: Partial<FillyPose> = {}): FillyPose {
 }
 
 /** Sanity ranges used by tests and by the model to clamp inputs. */
-export const POSE_BOUNDS: Readonly<Record<PoseKey, readonly [number, number]>> = Object.freeze({
-  bodyY: [-0.5, 1],
-  bodyScaleX: [0.6, 1.5],
-  bodyScaleY: [0.6, 1.5],
-  bodyPitch: [-0.6, 0.6],
-  bodyYaw: [-0.8, 0.8],
-  bodyRoll: [-0.6, 0.6],
-  earL: [-0.8, 0.8],
-  earR: [-0.8, 0.8],
-  armL: [-0.5, 2.5],
-  armR: [-0.5, 2.5],
-  armLChin: [0, 1],
-  eyeOpenL: [0, 1],
-  eyeOpenR: [0, 1],
-  eyeArc: [-1, 1],
-  eyeLookX: [-1, 1],
-  eyeLookY: [-1, 1],
-  eyeScale: [0.6, 1.6],
-  browL: [-1, 1],
-  browR: [-1, 1],
-  mouthOpen: [0, 1],
-  mouthWide: [0.4, 1.8],
-  mouthSmile: [-1, 1],
-  mouthRound: [0, 1],
-  cheek: [0, 1],
-  zzz: [0, 1],
-  bubbles: [0, 1],
-  waves: [0, 1],
-  sparks: [0, 1],
-});
+export const POSE_BOUNDS: Readonly<Record<PoseKey, readonly [number, number]>> =
+  Object.freeze({
+    bodyY: [-0.5, 1],
+    bodyScaleX: [0.6, 1.5],
+    bodyScaleY: [0.6, 1.5],
+    bodyPitch: [-0.6, 0.6],
+    bodyYaw: [-0.8, 0.8],
+    bodyRoll: [-0.6, 0.6],
+    earL: [-0.8, 0.8],
+    earR: [-0.8, 0.8],
+    armL: [-0.5, 2.5],
+    armR: [-0.5, 2.5],
+    armLChin: [0, 1],
+    eyeOpenL: [0, 1],
+    eyeOpenR: [0, 1],
+    eyeArc: [-1, 1],
+    eyeLookX: [-1, 1],
+    eyeLookY: [-1, 1],
+    eyeScale: [0.6, 1.6],
+    eyeWhite: [0, 1],
+    browL: [-1, 1],
+    browR: [-1, 1],
+    mouthOpen: [0, 1],
+    mouthWide: [0.4, 1.8],
+    mouthSmile: [-1, 1],
+    mouthRound: [0, 1],
+    cheek: [0, 1],
+    zzz: [0, 1],
+    bubbles: [0, 1],
+    waves: [0, 1],
+    sparks: [0, 1],
+  });
 
 export function clampPose(pose: FillyPose): FillyPose {
   for (const key of POSE_KEYS) {

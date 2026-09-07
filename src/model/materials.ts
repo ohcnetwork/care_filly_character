@@ -11,12 +11,18 @@ export interface FillyMaterials {
   body: THREE.MeshPhysicalMaterial;
   /** Recessed plus/cross face plate. */
   plate: THREE.MeshPhysicalMaterial;
+  /** Dark seam between the shell and the inset plate. */
+  plateShadow: THREE.MeshPhysicalMaterial;
   /** Ear and side tiles. */
   tile: THREE.MeshPhysicalMaterial;
   /** Arms and feet nubs. */
   limb: THREE.MeshPhysicalMaterial;
+  /** Slightly deeper material used by the planted feet. */
+  foot: THREE.MeshPhysicalMaterial;
   /** Glossy black eyeballs. */
   eye: THREE.MeshPhysicalMaterial;
+  /** Soft white sclera revealed for the thinking expression. */
+  eyeWhite: THREE.MeshPhysicalMaterial;
   /** Unlit white eye highlight (big, upper-left). */
   eyeHighlight: THREE.MeshBasicMaterial;
   /** Unlit soft-green secondary highlight (small, lower-right). */
@@ -25,8 +31,8 @@ export interface FillyMaterials {
   eyeLid: THREE.MeshStandardMaterial;
   /** Eyebrow arcs. */
   brow: THREE.MeshStandardMaterial;
-  /** Blush discs. */
-  cheek: THREE.MeshStandardMaterial;
+  /** Soft clay blush ovals that pick up the face lighting. */
+  cheek: THREE.MeshPhysicalMaterial;
   /** Mouth decal (canvas texture is attached per instance). */
   mouth: THREE.MeshBasicMaterial;
   /** Decoration strokes (zZ / bubbles / waves / sparks). Cloned per element. */
@@ -40,6 +46,27 @@ export type FillyMaterialKey = keyof FillyMaterials;
 const sheenTint = new THREE.Color();
 const WHITE = new THREE.Color("#ffffff");
 
+/** Fine moulded-clay grain, kept local so the mascot also works offline. */
+function clayGrain(): THREE.DataTexture {
+  const size = 128;
+  const pixels = new Uint8Array(size * size * 4);
+  let seed = 431;
+  for (let i = 0; i < size * size; i++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const value = 110 + (seed >>> 25);
+    pixels.set([value, value, value, 255], i * 4);
+  }
+  const texture = new THREE.DataTexture(pixels, size, size);
+  texture.name = "filly-clay-grain";
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(3, 3);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function toyMaterial(
   color: string,
   params: {
@@ -49,6 +76,7 @@ function toyMaterial(
     sheen?: number;
     sheenRoughness?: number;
     metalness?: number;
+    envMapIntensity?: number;
     vertexColors?: boolean;
   },
   name: string,
@@ -59,6 +87,7 @@ function toyMaterial(
     metalness: params.metalness ?? 0,
     clearcoat: params.clearcoat,
     clearcoatRoughness: params.clearcoatRoughness,
+    envMapIntensity: params.envMapIntensity ?? 1,
     // Baked top-light → bottom-shade gradients (see geometry.ts bakeVerticalGradient).
     vertexColors: params.vertexColors ?? false,
   });
@@ -70,6 +99,12 @@ function toyMaterial(
     mat.sheenColor.copy(sheenTint);
   }
   mat.name = name;
+  if (/^filly-(body|plate|tile|limb|foot)$/.test(name)) {
+    const grain = clayGrain();
+    mat.bumpMap = grain;
+    mat.bumpScale = 0.006;
+    mat.addEventListener("dispose", () => grain.dispose());
+  }
   return mat;
 }
 
@@ -93,19 +128,13 @@ export function buildFillyMaterials(): FillyMaterials {
     metalness: 0,
     name: "filly-brow",
   });
-  // Blush reads as flat solid pink on the sheet: mostly self-lit so the scene
-  // lighting and tone mapping cannot grey it out.
-  const cheek = new THREE.MeshStandardMaterial({
-    color: PALETTE.cheek,
-    emissive: PALETTE.cheek,
-    emissiveIntensity: 0.35,
-    roughness: MATERIALS.cheek.roughness,
-    metalness: 0,
-    transparent: true,
-    opacity: 1,
-    depthWrite: false,
-    name: "filly-cheek",
-  });
+  // Rounded blush picks up the same studio lighting as the surrounding face.
+  // A tiny warm fill keeps it peach even at the shaded edge of a turned pose.
+  const cheek = toyMaterial(PALETTE.cheek, MATERIALS.cheek, "filly-cheek");
+  cheek.transparent = true;
+  cheek.depthWrite = false;
+  cheek.emissive.set(PALETTE.cheek);
+  cheek.emissiveIntensity = 0.035;
   const mouth = new THREE.MeshBasicMaterial({
     color: "#ffffff",
     transparent: true,
@@ -138,13 +167,61 @@ export function buildFillyMaterials(): FillyMaterials {
     toneMapped: false,
     name: "filly-eyeHighlightSoft",
   });
+  const body = toyMaterial(
+    PALETTE.body,
+    { ...MATERIALS.body, vertexColors: true },
+    "filly-body",
+  );
+  // Keep the pale shell luminous without washing out its rounded form.
+  body.emissive.set(PALETTE.body);
+  body.emissiveIntensity = 0.015;
+  const eye = toyMaterial(PALETTE.eye, MATERIALS.eye, "filly-eye");
+  eye.specularIntensity = 0.25;
 
   return {
-    body: toyMaterial(PALETTE.body, { ...MATERIALS.body, vertexColors: true }, "filly-body"),
-    plate: toyMaterial(PALETTE.plate, { ...MATERIALS.plate, vertexColors: true }, "filly-plate"),
-    tile: toyMaterial(PALETTE.tile, { ...MATERIALS.tile, vertexColors: true }, "filly-tile"),
-    limb: toyMaterial(PALETTE.limb, { ...MATERIALS.limb, vertexColors: true }, "filly-limb"),
-    eye: toyMaterial(PALETTE.eye, MATERIALS.eye, "filly-eye"),
+    body,
+    plate: toyMaterial(
+      PALETTE.plate,
+      { ...MATERIALS.plate, vertexColors: true },
+      "filly-plate",
+    ),
+    plateShadow: toyMaterial(
+      PALETTE.plateShadow,
+      {
+        ...MATERIALS.plate,
+        roughness: 0.82,
+        clearcoat: 0,
+        sheen: 0,
+        vertexColors: true,
+      },
+      "filly-plateShadow",
+    ),
+    tile: toyMaterial(
+      PALETTE.tile,
+      { ...MATERIALS.tile, vertexColors: true },
+      "filly-tile",
+    ),
+    limb: toyMaterial(
+      PALETTE.limb,
+      { ...MATERIALS.limb, vertexColors: true },
+      "filly-limb",
+    ),
+    foot: toyMaterial(
+      PALETTE.foot,
+      { ...MATERIALS.limb, vertexColors: true },
+      "filly-foot",
+    ),
+    eye,
+    eyeWhite: toyMaterial(
+      "#f6f5dc",
+      {
+        roughness: 0.32,
+        clearcoat: 0.42,
+        clearcoatRoughness: 0.2,
+        vertexColors: false,
+      },
+      "filly-eyeWhite",
+    ),
     eyeHighlight,
     eyeHighlightSoft,
     eyeLid,

@@ -37,36 +37,38 @@ export const SPRING_PRESETS = {
 } as const satisfies Record<string, SpringConfig>;
 
 /** Spring tuning for every pose parameter. */
-export const POSE_SPRING_CONFIG: Readonly<Record<PoseKey, SpringConfig>> = Object.freeze({
-  bodyY: SPRING_PRESETS.medium,
-  bodyScaleX: SPRING_PRESETS.medium,
-  bodyScaleY: SPRING_PRESETS.medium,
-  bodyPitch: SPRING_PRESETS.medium,
-  bodyYaw: SPRING_PRESETS.medium,
-  bodyRoll: SPRING_PRESETS.medium,
-  earL: SPRING_PRESETS.medium,
-  earR: SPRING_PRESETS.medium,
-  armL: SPRING_PRESETS.medium,
-  armR: SPRING_PRESETS.medium,
-  armLChin: SPRING_PRESETS.medium,
-  eyeOpenL: SPRING_PRESETS.fast,
-  eyeOpenR: SPRING_PRESETS.fast,
-  eyeArc: SPRING_PRESETS.fast,
-  eyeLookX: SPRING_PRESETS.fast,
-  eyeLookY: SPRING_PRESETS.fast,
-  eyeScale: SPRING_PRESETS.fast,
-  browL: SPRING_PRESETS.fast,
-  browR: SPRING_PRESETS.fast,
-  mouthOpen: SPRING_PRESETS.fast,
-  mouthWide: SPRING_PRESETS.fast,
-  mouthSmile: SPRING_PRESETS.fast,
-  mouthRound: SPRING_PRESETS.fast,
-  cheek: SPRING_PRESETS.medium,
-  zzz: SPRING_PRESETS.slow,
-  bubbles: SPRING_PRESETS.slow,
-  waves: SPRING_PRESETS.slow,
-  sparks: SPRING_PRESETS.slow,
-});
+export const POSE_SPRING_CONFIG: Readonly<Record<PoseKey, SpringConfig>> =
+  Object.freeze({
+    bodyY: SPRING_PRESETS.medium,
+    bodyScaleX: SPRING_PRESETS.medium,
+    bodyScaleY: SPRING_PRESETS.medium,
+    bodyPitch: SPRING_PRESETS.medium,
+    bodyYaw: SPRING_PRESETS.medium,
+    bodyRoll: SPRING_PRESETS.medium,
+    earL: SPRING_PRESETS.medium,
+    earR: SPRING_PRESETS.medium,
+    armL: SPRING_PRESETS.medium,
+    armR: SPRING_PRESETS.medium,
+    armLChin: SPRING_PRESETS.medium,
+    eyeOpenL: SPRING_PRESETS.fast,
+    eyeOpenR: SPRING_PRESETS.fast,
+    eyeArc: SPRING_PRESETS.fast,
+    eyeLookX: SPRING_PRESETS.fast,
+    eyeLookY: SPRING_PRESETS.fast,
+    eyeScale: SPRING_PRESETS.fast,
+    eyeWhite: SPRING_PRESETS.fast,
+    browL: SPRING_PRESETS.fast,
+    browR: SPRING_PRESETS.fast,
+    mouthOpen: SPRING_PRESETS.fast,
+    mouthWide: SPRING_PRESETS.fast,
+    mouthSmile: SPRING_PRESETS.fast,
+    mouthRound: SPRING_PRESETS.fast,
+    cheek: SPRING_PRESETS.medium,
+    zzz: SPRING_PRESETS.slow,
+    bubbles: SPRING_PRESETS.slow,
+    waves: SPRING_PRESETS.slow,
+    sparks: SPRING_PRESETS.slow,
+  });
 
 /**
  * One-dimensional damped spring.
@@ -114,7 +116,10 @@ export class Spring {
 
   /** True when the spring is effectively at rest on its target. */
   settled(epsilon = 1e-4): boolean {
-    return Math.abs(this.value - this.target) < epsilon && Math.abs(this.velocity) < epsilon;
+    return (
+      Math.abs(this.value - this.target) < epsilon &&
+      Math.abs(this.velocity) < epsilon
+    );
   }
 
   /**

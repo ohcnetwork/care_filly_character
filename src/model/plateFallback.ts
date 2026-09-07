@@ -5,37 +5,15 @@
  * the rounded-plus outline via its signed distance field.
  */
 import * as THREE from "three";
+import { mascotFaceSdf } from "./mascotShape";
 
-const PLUS = {
-  vHalfWidth: 0.25,
-  vBottom: -0.62,
-  vTop: 0.58,
-  hHalfWidth: 0.62,
-  hBottom: -0.31,
-  hTop: 0.3,
-  cornerRadius: 0.07,
-} as const;
+/** Backward-compatible name for the shared canonical CARE plus SDF. */
+export const plusSdf = mascotFaceSdf;
 
-/** Signed distance to an axis-aligned rounded box given by its extents. */
-function sdRoundBox(px: number, py: number, x0: number, x1: number, y0: number, y1: number, r: number): number {
-  const cx = (x0 + x1) / 2;
-  const cy = (y0 + y1) / 2;
-  const hx = (x1 - x0) / 2 - r;
-  const hy = (y1 - y0) / 2 - r;
-  const qx = Math.abs(px - cx) - hx;
-  const qy = Math.abs(py - cy) - hy;
-  const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0));
-  const inside = Math.min(Math.max(qx, qy), 0);
-  return outside + inside - r;
-}
-
-/** Signed distance to the rounded plus (negative inside). */
-export function plusSdf(x: number, y: number): number {
-  const { vHalfWidth: vw, vBottom, vTop, hHalfWidth: hw, hBottom, hTop, cornerRadius: r } = PLUS;
-  return Math.min(
-    sdRoundBox(x, y, -vw, vw, vBottom, vTop, r),
-    sdRoundBox(x, y, -hw, hw, hBottom, hTop, r),
-  );
+export interface PlateProjectionScale {
+  x: number;
+  y: number;
+  z: number;
 }
 
 /**
@@ -43,8 +21,13 @@ export function plusSdf(x: number, y: number): number {
  * outside the outline are pulled onto it along the SDF gradient; then every
  * vertex is projected onto a sphere of `radius`.
  */
-export function buildPlateDecalGeometry(radius: number, cell = 0.02): THREE.BufferGeometry {
-  const half = 0.66;
+export function buildPlateDecalGeometry(
+  radius: number,
+  cell = 0.02,
+  bodyScale: PlateProjectionScale = { x: 1, y: 1, z: 1 },
+  outlineScale = 1,
+): THREE.BufferGeometry {
+  const half = 0.72;
   const n = Math.ceil((half * 2) / cell);
   const step = (half * 2) / n;
   const positions: number[] = [];
@@ -73,13 +56,27 @@ export function buildPlateDecalGeometry(radius: number, cell = 0.02): THREE.Buff
     const key = `${i},${j}`;
     const existing = vertexIndex.get(key);
     if (existing !== undefined) return existing;
-    const [x, y] = snap(-half + i * step, -half + j * step);
-    const zz = Math.max(radius * radius - x * x - y * y, 0);
-    const z = Math.sqrt(zz);
-    const len = Math.hypot(x, y, z) || 1;
+    const snapped = snap(
+      (-half + i * step) / outlineScale,
+      (-half + j * step) / outlineScale,
+    );
+    const x = snapped[0] * outlineScale;
+    const y = snapped[1] * outlineScale;
+    const nx = x / (radius * bodyScale.x);
+    const ny = y / (radius * bodyScale.y);
+    const z =
+      radius * bodyScale.z * Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+    const normalX = x / (bodyScale.x * bodyScale.x);
+    const normalY = y / (bodyScale.y * bodyScale.y);
+    const normalZ = z / (bodyScale.z * bodyScale.z);
+    const normalLength = Math.hypot(normalX, normalY, normalZ) || 1;
     const idx = positions.length / 3;
-    positions.push((x / len) * radius, (y / len) * radius, (z / len) * radius);
-    normals.push(x / len, y / len, z / len);
+    positions.push(x, y, z);
+    normals.push(
+      normalX / normalLength,
+      normalY / normalLength,
+      normalZ / normalLength,
+    );
     uvs.push((x + half) / (2 * half), (y + half) / (2 * half));
     vertexIndex.set(key, idx);
     return idx;
@@ -87,13 +84,14 @@ export function buildPlateDecalGeometry(radius: number, cell = 0.02): THREE.Buff
 
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      const x0 = -half + i * step;
-      const y0 = -half + j * step;
+      const x0 = (-half + i * step) / outlineScale;
+      const y0 = (-half + j * step) / outlineScale;
+      const scaledStep = step / outlineScale;
       const inside =
         plusSdf(x0, y0) <= 0 ||
-        plusSdf(x0 + step, y0) <= 0 ||
-        plusSdf(x0, y0 + step) <= 0 ||
-        plusSdf(x0 + step, y0 + step) <= 0;
+        plusSdf(x0 + scaledStep, y0) <= 0 ||
+        plusSdf(x0, y0 + scaledStep) <= 0 ||
+        plusSdf(x0 + scaledStep, y0 + scaledStep) <= 0;
       if (!inside) continue;
       const a = vertex(i, j);
       const b = vertex(i + 1, j);
@@ -104,7 +102,10 @@ export function buildPlateDecalGeometry(radius: number, cell = 0.02): THREE.Buff
   }
 
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(positions, 3),
+  );
   geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);

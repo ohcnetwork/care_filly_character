@@ -14,8 +14,15 @@
 import * as THREE from "three";
 import { POSE_BOUNDS, type FillyPose, type PoseKey } from "../core/types";
 import { FillyDecorations } from "./decorations";
-import { applyEyePose, buildCheek, buildEye, ensureEyeTexture, MouthDecal, type EyeRig } from "./face";
-import { getBodyGeometry } from "./geometry";
+import {
+  applyEyePose,
+  buildCheek,
+  buildEye,
+  ensureEyeTexture,
+  MouthDecal,
+  type EyeRig,
+} from "./face";
+import { getBodyGeometry, getPlateSurfaceGeometry } from "./geometry";
 import {
   FEET_BOTTOM,
   applyArmPose,
@@ -41,11 +48,11 @@ export const FILLY_MODEL_BOUNDS = Object.freeze({
   /** Bottom of the contact shadow. */
   minY: -1.02,
   /** Top of the ear tabs. */
-  maxY: BODY_LIFT - 1 + 1.06,
+  maxY: BODY_LIFT - 1 + 1.18,
   /** Horizontal radius including side tiles and arms (decorations excluded). */
-  radius: 1.1,
+  radius: 1.12,
   /** Vertical centre of the character in model space (for camera targets). */
-  centerY: (BODY_LIFT - 1 + 1.06 - 1.02) / 2,
+  centerY: (BODY_LIFT - 1 + 1.18 - 1.02) / 2,
 });
 
 export interface FillyModelOptions {
@@ -53,7 +60,7 @@ export interface FillyModelOptions {
   materials?: Partial<FillyMaterials>;
   /** Include the contact shadow plane (default true). */
   shadow?: boolean;
-  /** Paint a green iris + pupil onto the eyes (default false: solid glossy eyes like the hero). */
+  /** Paint emerald irises as in the reference (default true; false gives solid dark eyes). */
   irisTexture?: boolean;
 }
 
@@ -62,6 +69,7 @@ export interface FillyParts {
   bodyPivot: THREE.Group;
   bodyGroup: THREE.Group;
   body: THREE.Mesh;
+  plateSurface: THREE.Mesh;
   /** Present only when the CSG recess failed (fallback decal). */
   plateDecal?: THREE.Mesh;
   earL: THREE.Group;
@@ -119,7 +127,8 @@ export class FillyModel extends THREE.Group {
     this.ownsMaterials = new Set<THREE.Material>();
     for (const key of Object.keys(defaults) as Array<keyof FillyMaterials>) {
       // Defaults replaced by overrides are never used: drop them now.
-      if (this.materials[key] === defaults[key]) this.ownsMaterials.add(defaults[key]);
+      if (this.materials[key] === defaults[key])
+        this.ownsMaterials.add(defaults[key]);
       else defaults[key].dispose();
     }
     const mats = this.materials;
@@ -137,10 +146,16 @@ export class FillyModel extends THREE.Group {
     const bodyGeo = getBodyGeometry();
     const body = new THREE.Mesh(
       bodyGeo.geometry,
-      bodyGeo.slots.map((slot) => mats[slot]),
+      bodyGeo.slots.map((slot) =>
+        slot === "plate" ? mats.plateShadow : mats[slot],
+      ),
     );
     body.name = "body";
     bodyGroup.add(body);
+    const plateSurface = new THREE.Mesh(getPlateSurfaceGeometry(), mats.plate);
+    plateSurface.name = "plateSurface";
+    plateSurface.renderOrder = 1;
+    bodyGroup.add(plateSurface);
     let plateDecal: THREE.Mesh | undefined;
     if (bodyGeo.plateDecal) {
       plateDecal = new THREE.Mesh(bodyGeo.plateDecal, mats.plate);
@@ -169,13 +184,27 @@ export class FillyModel extends THREE.Group {
 
     // Face. Solid glossy eyes like the hero image; `irisTexture: true` paints a
     // green iris onto the shared eye material instead (null without a DOM).
-    this.eyeTexture = opts.irisTexture ? ensureEyeTexture(mats) : null;
+    this.eyeTexture = opts.irisTexture !== false ? ensureEyeTexture(mats) : null;
     this.eyeL = buildEye(-1, mats);
     this.eyeR = buildEye(1, mats);
     const cheekL = buildCheek(-1, mats);
     const cheekR = buildCheek(1, mats);
     this.mouth = new MouthDecal(mats);
-    bodyGroup.add(this.eyeL.group, this.eyeR.group, cheekL, cheekR, this.mouth.mesh);
+    bodyGroup.add(
+      this.eyeL.group,
+      this.eyeR.group,
+      cheekL,
+      cheekR,
+      this.mouth.mesh,
+    );
+
+    // The pads and hands cast a soft seam onto the shell, grounding the
+    // separate pieces as a single sculpted toy under the studio key light.
+    for (const part of [body, plateSurface, sideL, sideR, footL, footR,
+      this.earL.tile, this.earR.tile, this.armL.hand, this.armR.hand]) {
+      part.castShadow = true;
+      part.receiveShadow = true;
+    }
 
     // Shadow + decorations live outside the squash pivot.
     this.shadow = new ContactShadow(mats);
@@ -191,6 +220,7 @@ export class FillyModel extends THREE.Group {
       bodyPivot,
       bodyGroup,
       body,
+      plateSurface,
       plateDecal,
       earL: this.earL.group,
       earR: this.earR.group,
@@ -237,7 +267,12 @@ export class FillyModel extends THREE.Group {
     applyEarPose(this.earL, clampKey("earL", pose.earL));
     applyEarPose(this.earR, clampKey("earR", pose.earR));
 
-    applyArmPose(this.armL, clampKey("armL", pose.armL), clampKey("armLChin", pose.armLChin));
+    applyArmPose(
+      this.armL,
+      clampKey("armL", pose.armL),
+      clampKey("armLChin", pose.armLChin),
+      clampKey("zzz", pose.zzz),
+    );
     applyArmPose(this.armR, clampKey("armR", pose.armR), 0);
 
     const arc = clampKey("eyeArc", pose.eyeArc);
@@ -251,6 +286,7 @@ export class FillyModel extends THREE.Group {
       lookX,
       lookY,
       eyeScale,
+      clampKey("eyeWhite", pose.eyeWhite),
       clampKey("browL", pose.browL),
     );
     applyEyePose(
@@ -260,12 +296,13 @@ export class FillyModel extends THREE.Group {
       lookX,
       lookY,
       eyeScale,
+      clampKey("eyeWhite", pose.eyeWhite),
       clampKey("browR", pose.browR),
     );
 
     const cheek = clampKey("cheek", pose.cheek);
     // Blush never fully disappears below the idle level; it reads as solid pink at 1.
-    this.materials.cheek.opacity = (0.45 + 0.55 * cheek) * CHEEK_MAX_OPACITY;
+    this.materials.cheek.opacity = (0.72 + 0.28 * cheek) * CHEEK_MAX_OPACITY;
     parts.cheekL.visible = parts.cheekR.visible = cheek > 0.01;
 
     this.mouth.update(
@@ -281,6 +318,7 @@ export class FillyModel extends THREE.Group {
       clampKey("waves", pose.waves),
       clampKey("sparks", pose.sparks),
       time,
+      pose.mouthRound < 0.65 && pose.sparks > 0 && pose.mouthOpen > 0.1,
     );
     this.shadow.update(bodyY, sx);
   }
@@ -301,7 +339,8 @@ export class FillyModel extends THREE.Group {
     this.eyeR.arcMaterial.dispose();
     if (this.eyeTexture) {
       // Only detach from materials we own; overrides keep whatever they had.
-      if (this.ownsMaterials.has(this.materials.eye)) this.materials.eye.map = null;
+      if (this.ownsMaterials.has(this.materials.eye))
+        this.materials.eye.map = null;
       this.eyeTexture.dispose();
     }
     for (const m of this.ownsMaterials) m.dispose();

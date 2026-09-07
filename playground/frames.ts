@@ -19,12 +19,12 @@ export interface SheetFrame {
 }
 
 export const SHEET_FRAMES: readonly SheetFrame[] = [
-  { id: "idle", state: "idle", t: 1.0, title: "1. IDLE", caption: "Default resting state." },
-  { id: "blink", state: "idle", t: 0.13, freezeBlink: true, title: "2. BLINK", caption: "Quick natural blink." },
-  { id: "listening", state: "listening", t: 1.2, title: "3. LISTENING", caption: "Attentive and engaged." },
-  { id: "talking", state: "talking", t: 1.35, audio: 0.7, title: "4. TALKING", caption: "Mouth opens for speech." },
-  { id: "happy", state: "happy", t: 1.18, title: "5. HAPPY BOUNCE", caption: "Up, squash, down, stretch." },
-  { id: "thinking", state: "thinking", t: 1.5, title: "6. THINKING", caption: "Curious and thoughtful." },
-  { id: "surprised", state: "surprised", t: 1.1, title: "7. SURPRISED", caption: "Wide eyes, tiny 'o' mouth." },
-  { id: "sleepy", state: "sleepy", t: 2.0, title: "8. SLEEPY", caption: "Resting and recharging." },
+  { id: "idle", state: "idle", t: 1.0, title: "IDLE", caption: "Relaxed and friendly neutral pose." },
+  { id: "blink", state: "idle", t: 0.13, freezeBlink: true, title: "BLINK", caption: "Slow gentle blink." },
+  { id: "listening", state: "listening", t: 1.2, title: "LISTENING", caption: "Head tilt and hand up to listen closely." },
+  { id: "talking", state: "talking", t: 1.35, audio: 0.7, title: "TALKING", caption: "Open mouth with a friendly speaking pose." },
+  { id: "happy", state: "happy", t: 1.18, title: "HAPPY BOUNCE", caption: "Excited bounce with joyful energy!" },
+  { id: "thinking", state: "thinking", t: 1.5, title: "THINKING", caption: "Curious and thoughtful pondering pose." },
+  { id: "surprised", state: "surprised", t: 1.1, title: "SURPRISED", caption: "Wide eyes and tiny “o” mouth in surprise." },
+  { id: "sleepy", state: "sleepy", t: 2.0, title: "SLEEPY", caption: "Cozy and calm, ready for a nap." },
 ];

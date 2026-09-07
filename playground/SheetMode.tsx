@@ -1,7 +1,9 @@
-/** `?sheet=1` — the 8 sheet frames in a 4×2 grid, labelled like the reference. */
+/** The eight expression portraits, composed to match the character reference. */
 import { useCallback, useRef, useState } from "react";
+import { ArrowUpRight } from "@phosphor-icons/react";
 import { FillyCharacter } from "../src/react/FillyCharacter";
 import { SHEET_FRAMES } from "./frames";
+import { ExpressionIcon } from "./ExpressionIcon";
 
 export function SheetMode({ cell }: { cell: number }) {
   const readyCount = useRef(0);
@@ -12,34 +14,38 @@ export function SheetMode({ cell }: { cell: number }) {
   }, []);
 
   return (
-    <div className="sheet" data-ready={allReady ? "1" : undefined}>
-      <div className="sheet-header">
-        <div>
-          <span className="badge">CARE MASCOT ♥</span>
-          <h1>Animation States</h1>
-        </div>
-        <div className="tag">
-          <b>Soft. Friendly. Helpful.</b> Built for gentle UI motion.
-        </div>
-      </div>
+    <main className="sheet" data-ready={allReady ? "1" : undefined}>
+      <header className="sheet-header">
+        <a className="studio-brand" href="./" aria-label="Return to Filly’s character studio">
+          <span className="care-wordmark">CARE</span>
+          <span className="brand-divider" />
+          <span>Filly</span>
+        </a>
+        <h1>One little friend. So many feelings.</h1>
+        <a className="sheet-link" href="./">Back to studio <ArrowUpRight size={18} aria-hidden="true" /></a>
+      </header>
       <div className="sheet-grid">
-        {SHEET_FRAMES.map((f) => (
-          <div className="sheet-cell" key={f.id} data-frame={f.id}>
+        {SHEET_FRAMES.map((frame) => (
+          <section className="sheet-cell" key={frame.id} data-frame={frame.id} aria-labelledby={`pose-${frame.id}`}>
             <FillyCharacter
-              state={f.state}
-              size={cell}
-              freezeAt={f.t}
-              freezeBlink={f.freezeBlink}
-              audioLevel={f.audio ?? null}
+              className="sheet-portrait"
+              state={frame.state}
+              size={`min(${Math.round(cell * 1.17)}px, calc(100% + 54px))`}
+              style={{ height: "auto", aspectRatio: "1" }}
+              freezeAt={frame.t}
+              dpr={2}
+              freezeBlink={frame.freezeBlink}
+              audioLevel={frame.audio ?? null}
               followPointer={false}
               interactive={false}
               onReady={onReady}
             />
-            <div className="title">{f.title}</div>
-            <div className="caption">{f.caption}</div>
-          </div>
+            <h2 className="title" id={`pose-${frame.id}`}>{frame.title}</h2>
+            <p className="caption">{frame.caption}</p>
+            <ExpressionIcon className="sheet-symbol" expression={frame.id} size={28} weight={frame.id === "idle" || frame.id === "happy" ? "fill" : "light"} />
+          </section>
         ))}
       </div>
-    </div>
+    </main>
   );
 }

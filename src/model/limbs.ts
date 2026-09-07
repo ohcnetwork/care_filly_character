@@ -3,7 +3,16 @@
  * per-frame pose appliers for the articulated ones (ears, arms).
  */
 import * as THREE from "three";
-import { EAR_TILE, getEarTileGeometry, getSideTileGeometry, getUnitSphereGeometry } from "./geometry";
+import {
+  BODY_BOTTOM,
+  EAR_TILE,
+  bodyZ,
+  getEarTileGeometry,
+  getFootGeometry,
+  getHandGeometry,
+  getSideTileGeometry,
+} from "./geometry";
+import { MASCOT_FACE } from "./mascotShape";
 import type { FillyMaterials } from "./materials";
 
 // ── layout constants (body units; x = body half-width) ──────────────────────
@@ -13,33 +22,65 @@ import type { FillyMaterials } from "./materials";
 // arms and feet.
 
 /**
- * Ear tabs: flat slabs standing straight up from the bar's top edge (hTop),
- * flanking the pale notch. `z` is the slab's centre depth: the front face sits
- * just proud of the plate rim, the back is inside the body at the base.
+ * Ear tabs: inflated slabs that emerge from the upper shell and lean back
+ * with its curvature. The pivot remains at the tile's lower edge so listening
+ * and sleepy poses still feel organic.
  */
-export const EAR_ANCHOR = { x: 0.37, baseY: 0.56, z: 0.66, face: 1.0, splay: 0.0 } as const;
-/** Side tiles: squares butting the bar ends (inner edge = hHalfWidth). */
-export const SIDE_ANCHOR = { x: 0.75, y: 0.31, z: 0.58, face: 1.0 } as const;
-/** Arms: big ellipsoids on the lower sides, tops tucked into the body, tilted outward. */
-export const SHOULDER = { x: 0.78, y: -0.1, z: 0.3 } as const;
-export const HAND_REST = { x: 0.12, y: -0.2, z: 0.02 } as const;
+export const EAR_ANCHOR = {
+  x: 0.34,
+  baseY: MASCOT_FACE.hTop - 0.03,
+  orientY: 0.78,
+  face: 1,
+  splay: 0.035,
+  bury: 0.025,
+  depthOffset: 0.035,
+} as const;
+/** Side tiles: rounded cushions butting the bar ends and following the shell. */
+export const SIDE_ANCHOR = {
+  x: MASCOT_FACE.hHalfWidth + 0.19,
+  y: 0.31,
+  // Keep the entire canonical square in front of the curved shell. A smaller
+  // lift lets the sphere occlude the inner corners and turns the logo pixels
+  // into crescent-shaped cushions in front view.
+  depthOffset: 0.16,
+  face: 1,
+} as const;
+/** Arms: plump ellipsoids hung low on the sides, tilted gently outward. */
+export const SHOULDER = { x: 0.68, y: -0.12, z: 0.57 } as const;
+export const HAND_REST = { x: 0.15, y: -0.26, z: 0.04 } as const;
 /** Resting tilt of the arm (radians, top toward the body). */
-export const ARM_TILT = 0.3;
-/** Hand-to-chin world position for the viewer's-left arm (THINKING): just left of the mouth. */
-export const HAND_CHIN = { x: -0.36, y: -0.1, z: 0.86 } as const;
-export const HAND_SCALE = { x: 0.15, y: 0.2, z: 0.14 } as const;
-/** Feet: big flat ovals under the front, hanging a little below the body. */
-export const FOOT = { x: 0.45, y: -0.74, z: 0.42, sx: 0.16, sy: 0.115, sz: 0.16, tilt: 0.12 } as const;
-/** Lowest point of the character (foot bottoms) — the model is lifted so this sits on y = −1. */
-export const FEET_BOTTOM = FOOT.y - FOOT.sy;
+export const ARM_TILT = 0.18;
+/** Hand-to-chin position, in body coordinates, beneath the little smile. */
+export const HAND_CHIN = { x: -0.1, y: -0.35, z: 0.91 } as const;
+/** Sleepy hand rests against the outer cheek, above the thinking chin pose. */
+export const HAND_CHEEK = { x: -0.45, y: -0.05, z: 0.82 } as const;
+export const HAND_SCALE = { x: 0.125, y: 0.195, z: 0.14 } as const;
+/** Feet: small, diagonally placed ovals tucked into the lower shell. */
+export const FOOT = {
+  x: 0.43,
+  y: -0.75,
+  z: 0.42,
+  sx: 0.19,
+  sy: 0.11,
+  sz: 0.225,
+  tilt: 0.34,
+} as const;
+/** Lowest rig point: the shell can sit below the tucked-in feet. */
+export const FEET_BOTTOM = Math.min(
+  BODY_BOTTOM,
+  FOOT.y - Math.hypot(
+    FOOT.sx * Math.sin(FOOT.tilt),
+    FOOT.sy * Math.cos(FOOT.tilt),
+  ),
+);
 /**
  * Ear perk: + tips the tab forward (about local x) with a little outward
  * swing (about local z); − lies it back (droop) with a touch of inward swing
  * so the two ears never collide.
  */
-export const EAR_TILT_X = 0.3;
-export const EAR_SWING_OUT = 0.08;
-export const EAR_SWING_IN = 0.12;
+export const EAR_TILT_X = 0.72;
+export const EAR_SWING_OUT = 0.12;
+export const EAR_SWING_IN = 0.2;
 
 // ── scratch objects ──────────────────────────────────────────────────────────
 
@@ -88,19 +129,29 @@ export function buildEar(side: -1 | 1, materials: FillyMaterials): EarRig {
   const group = new THREE.Group();
   group.name = side < 0 ? "earL" : "earR";
   const x = side * EAR_ANCHOR.x;
-  // Orientation: straight up, facing the viewer (face = 1 → local +z = world +z).
-  placeSurfaceFrame(group, x, EAR_ANCHOR.baseY, EAR_ANCHOR.z, 1, EAR_ANCHOR.face);
-  // Pivot at the slab's bottom edge, on the bar's top line.
-  group.position.set(x, EAR_ANCHOR.baseY, EAR_ANCHOR.z);
-  if (EAR_ANCHOR.splay !== 0) {
-    _qz.setFromAxisAngle(Z_AXIS, -side * EAR_ANCHOR.splay);
-    group.quaternion.multiply(_qz);
-  }
+  // Orient from a point around the tile's centre, then move the pivot to its
+  // bottom edge. This follows the round shell without making the front face
+  // look sharply foreshortened.
+  placeSurfaceFrame(
+    group,
+    x,
+    EAR_ANCHOR.orientY,
+    bodyZ(x, EAR_ANCHOR.orientY),
+    1,
+    EAR_ANCHOR.face,
+  );
+  group.position.set(
+    x,
+    EAR_ANCHOR.baseY,
+    bodyZ(x, EAR_ANCHOR.baseY) + EAR_ANCHOR.depthOffset,
+  );
+  _qz.setFromAxisAngle(Z_AXIS, -side * EAR_ANCHOR.splay);
+  group.quaternion.multiply(_qz);
   const base = group.quaternion.clone();
 
   const tile = new THREE.Mesh(getEarTileGeometry(), materials.tile);
   tile.name = "earTile";
-  tile.position.set(0, EAR_TILE.h / 2 - 0.02, 0);
+  tile.position.set(0, EAR_TILE.h / 2, -EAR_ANCHOR.bury);
   group.add(tile);
   return { group, tile, base, side };
 }
@@ -112,18 +163,34 @@ export function buildEar(side: -1 | 1, materials: FillyMaterials): EarRig {
  */
 export function applyEarPose(ear: EarRig, angle: number): void {
   _qx.setFromAxisAngle(X_AXIS, angle * EAR_TILT_X);
-  _qz.setFromAxisAngle(Z_AXIS, -ear.side * Math.abs(angle) * (angle > 0 ? EAR_SWING_OUT : EAR_SWING_IN));
+  _qz.setFromAxisAngle(
+    Z_AXIS,
+    -ear.side * Math.abs(angle) * (angle > 0 ? EAR_SWING_OUT : EAR_SWING_IN),
+  );
   ear.group.quaternion.copy(ear.base).multiply(_qx).multiply(_qz);
 }
 
 /** Static side tile at the end of the plus's horizontal arm. */
-export function buildSideTile(side: -1 | 1, materials: FillyMaterials): THREE.Mesh {
+export function buildSideTile(
+  side: -1 | 1,
+  materials: FillyMaterials,
+): THREE.Mesh {
   const tile = new THREE.Mesh(getSideTileGeometry(), materials.tile);
   tile.name = side < 0 ? "sideL" : "sideR";
   const x = side * SIDE_ANCHOR.x;
-  // Faces the viewer straight on; position is the raw anchor point.
-  placeSurfaceFrame(tile, x, SIDE_ANCHOR.y, SIDE_ANCHOR.z, 1, SIDE_ANCHOR.face);
-  tile.position.set(x, SIDE_ANCHOR.y, SIDE_ANCHOR.z);
+  const z = bodyZ(x, SIDE_ANCHOR.y);
+  placeSurfaceFrame(
+    tile,
+    x,
+    SIDE_ANCHOR.y,
+    z,
+    1 + SIDE_ANCHOR.depthOffset,
+    SIDE_ANCHOR.face,
+  );
+  // `placeSurfaceFrame` normalizes its input for articulated limbs. Restore
+  // the exact CARE grid x/y here and use depth only to lift the full square
+  // above the shell instead of letting the sphere crop it into a wedge.
+  tile.position.set(x, SIDE_ANCHOR.y, z + SIDE_ANCHOR.depthOffset);
   return tile;
 }
 
@@ -136,18 +203,20 @@ export interface ArmRig {
   rest: THREE.Vector3;
   /** Hand offset at the chin (group-local), used by armLChin. */
   chin: THREE.Vector3;
+  /** Hand offset at the cheek (group-local), used by the sleepy blend. */
+  cheek: THREE.Vector3;
 }
 
 export function buildArm(side: -1 | 1, materials: FillyMaterials): ArmRig {
   const group = new THREE.Group();
   group.name = side < 0 ? "armL" : "armR";
   group.position.set(side * SHOULDER.x, SHOULDER.y, SHOULDER.z);
-  const hand = new THREE.Mesh(getUnitSphereGeometry(), materials.limb);
+  const hand = new THREE.Mesh(getHandGeometry(), materials.limb);
   hand.name = side < 0 ? "handL" : "handR";
   hand.scale.set(HAND_SCALE.x, HAND_SCALE.y, HAND_SCALE.z);
   hand.position.set(side * HAND_REST.x, HAND_REST.y, HAND_REST.z);
   // Top of the arm leans into the body, like the hero's tilted ovals.
-  hand.rotation.z = -side * ARM_TILT;
+  hand.rotation.z = side * ARM_TILT;
   group.add(hand);
   const rest = hand.position.clone();
   // Chin target mirrored to this side, expressed relative to the shoulder.
@@ -156,24 +225,57 @@ export function buildArm(side: -1 | 1, materials: FillyMaterials): ArmRig {
     HAND_CHIN.y - SHOULDER.y,
     HAND_CHIN.z - SHOULDER.z,
   );
-  return { group, hand, side, rest, chin };
+  const cheek = new THREE.Vector3(
+    side * -HAND_CHEEK.x - side * SHOULDER.x,
+    HAND_CHEEK.y - SHOULDER.y,
+    HAND_CHEEK.z - SHOULDER.z,
+  );
+  return { group, hand, side, rest, chin, cheek };
 }
 
 /**
- * Raise the arm (rotation about z, hand swings outward/up) and blend the hand
- * toward the chin. Allocation-free.
+ * Swing the hand outward/up without turning it into a horizontal flipper.
+ * The wrist counter-rotates so the soft pear remains upright, then folds
+ * diagonally under the chin for thinking or against the cheek for sleep.
+ * Above the conversational raise, the shoulder lifts into a happy gesture.
+ * Allocation-free.
  */
-export function applyArmPose(arm: ArmRig, raise: number, chinBlend: number): void {
-  arm.group.rotation.z = arm.side * raise * (1 - chinBlend);
-  arm.hand.position.copy(arm.rest).lerp(arm.chin, chinBlend);
+export function applyArmPose(
+  arm: ArmRig,
+  raise: number,
+  chinBlend: number,
+  cheekBlend = 0,
+): void {
+  const chin = THREE.MathUtils.clamp(chinBlend, 0, 1);
+  const cheek = THREE.MathUtils.clamp(cheekBlend, 0, 1);
+  const swingWeight = (1 - chin) * (1 - cheek);
+  const celebration = THREE.MathUtils.smoothstep(raise, 1.55, 1.9);
+  const spread = THREE.MathUtils.clamp(raise - 1.55, 0, 1) * 0.17;
+  arm.group.position.x = arm.side * (SHOULDER.x + spread * swingWeight);
+  arm.group.position.y = SHOULDER.y + 0.045 * celebration * swingWeight;
+  arm.group.rotation.z = arm.side * raise * swingWeight;
+  arm.hand.position.copy(arm.rest).lerp(arm.chin, chin).lerp(arm.cheek, cheek);
+  const restAngle = arm.side * (ARM_TILT - raise * 0.42);
+  const chinAngle = arm.side * 0.8;
+  const cheekAngle = arm.side * 1.15;
+  arm.hand.rotation.z = THREE.MathUtils.lerp(
+    THREE.MathUtils.lerp(restAngle, chinAngle, chin), cheekAngle, cheek,
+  )
+    - arm.group.rotation.z;
+  const chinScale = 1 + Math.max(chin, cheek) * 0.04;
+  arm.hand.scale.set(
+    HAND_SCALE.x * chinScale,
+    HAND_SCALE.y * chinScale,
+    HAND_SCALE.z * chinScale,
+  );
 }
 
 /** Flattened foot ellipsoid at the bottom front. */
 export function buildFoot(side: -1 | 1, materials: FillyMaterials): THREE.Mesh {
-  const foot = new THREE.Mesh(getUnitSphereGeometry(), materials.limb);
+  const foot = new THREE.Mesh(getFootGeometry(), materials.foot);
   foot.name = side < 0 ? "footL" : "footR";
   foot.scale.set(FOOT.sx, FOOT.sy, FOOT.sz);
   foot.position.set(side * FOOT.x, FOOT.y, FOOT.z);
-  foot.rotation.z = -side * FOOT.tilt;
+  foot.rotation.z = side * FOOT.tilt;
   return foot;
 }

@@ -64,7 +64,9 @@ describe("FillyModel", () => {
     expect(box.min.y).toBeGreaterThan(-1.05);
     expect(box.min.y).toBeLessThan(-0.95);
     expect(box.max.y).toBeLessThan(FILLY_MODEL_BOUNDS.maxY + 0.05);
-    expect(Math.max(-box.min.x, box.max.x)).toBeLessThan(FILLY_MODEL_BOUNDS.radius + 0.05);
+    expect(Math.max(-box.min.x, box.max.x)).toBeLessThan(
+      FILLY_MODEL_BOUNDS.radius + 0.05,
+    );
     model.dispose();
   });
 
@@ -96,14 +98,19 @@ describe("FillyModel", () => {
 
   it("drives the body pivot, ears, eyes and decorations from the pose", () => {
     const model = new FillyModel();
-    model.applyPose(createPose({ bodyY: 0.5, bodyScaleX: 1.2, bodyScaleY: 0.8 }), 0);
+    model.applyPose(
+      createPose({ bodyY: 0.5, bodyScaleX: 1.2, bodyScaleY: 0.8 }),
+      0,
+    );
     expect(model.parts.bodyPivot.position.y).toBeCloseTo(-0.5);
     expect(model.parts.bodyPivot.scale.x).toBeCloseTo(1.2);
     expect(model.parts.bodyPivot.scale.z).toBeCloseTo(1.2);
     expect(model.parts.bodyPivot.scale.y).toBeCloseTo(0.8);
     // Shadow shrinks and fades as the body rises.
     expect(model.parts.shadow.scale.y).toBeLessThan(1);
-    expect((model.parts.shadow.material as THREE.MeshBasicMaterial).opacity).toBeLessThan(0.35);
+    expect(
+      (model.parts.shadow.material as THREE.MeshBasicMaterial).opacity,
+    ).toBeLessThan(0.35);
 
     // Closed eyes: lid hidden, arc visible.
     model.applyPose(createPose({ eyeOpenL: 0, eyeOpenR: 1, eyeArc: -1 }), 0);
@@ -122,14 +129,18 @@ describe("FillyModel", () => {
     const hl = eyeL.getObjectByName("highlightBig")!;
     // Gaze rotates the textured ball (look right → positive yaw); highlights stay put.
     expect(ball.rotation.y).toBeGreaterThan(0);
-    expect(hl.position.x).toBeCloseTo(-0.045);
+    expect(hl.position.x).toBeCloseTo(-0.041);
 
     // Decorations toggle visibility with their master opacity.
     expect(model.parts.decorations.getObjectByName("zzz")!.visible).toBe(false);
     model.applyPose(createPose({ zzz: 1, waves: 0.5 }), 4);
     expect(model.parts.decorations.getObjectByName("zzz")!.visible).toBe(true);
-    expect(model.parts.decorations.getObjectByName("waves")!.visible).toBe(true);
-    expect(model.parts.decorations.getObjectByName("bubbles")!.visible).toBe(false);
+    expect(model.parts.decorations.getObjectByName("waves")!.visible).toBe(
+      true,
+    );
+    expect(model.parts.decorations.getObjectByName("bubbles")!.visible).toBe(
+      false,
+    );
 
     // Thinking: left hand moves to the chin (front, lower-left).
     model.applyPose(createPose({ armLChin: 1 }), 0);
@@ -137,7 +148,7 @@ describe("FillyModel", () => {
     const handWorld = new THREE.Vector3();
     model.parts.handL.getWorldPosition(handWorld);
     expect(handWorld.x).toBeLessThan(0);
-    expect(handWorld.z).toBeGreaterThan(0.8);
+    expect(handWorld.z).toBeGreaterThan(0.7);
     expect(handWorld.y).toBeLessThan(-0.2);
     model.dispose();
   });
@@ -169,7 +180,8 @@ describe("FillyModel", () => {
 
 describe("plate decal fallback", () => {
   it("builds a finite, non-empty geometry hugging the sphere", async () => {
-    const { buildPlateDecalGeometry, plusSdf } = await import("./plateFallback");
+    const { buildPlateDecalGeometry, plusSdf } =
+      await import("./plateFallback");
     const geo = buildPlateDecalGeometry(1.004);
     const pos = geo.getAttribute("position");
     expect(pos.count).toBeGreaterThan(500);

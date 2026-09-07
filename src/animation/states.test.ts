@@ -34,7 +34,8 @@ describe("FillyAnimator — idle", () => {
     let moved = false;
     for (let i = 0; i < 60 * 12; i++) {
       const p = a.update(DT);
-      if (Math.abs(p.eyeLookX) > 0.1 || Math.abs(p.eyeLookY) > 0.1) moved = true;
+      if (Math.abs(p.eyeLookX) > 0.1 || Math.abs(p.eyeLookY) > 0.1)
+        moved = true;
     }
     expect(moved).toBe(true);
   });
@@ -55,7 +56,11 @@ describe("FillyAnimator — listening", () => {
 
   it("ear wiggle grows with audio level", () => {
     const amp = (level: number | null): number => {
-      const a = new FillyAnimator({ seed: 1, autoBlink: false, initialState: "listening" });
+      const a = new FillyAnimator({
+        seed: 1,
+        autoBlink: false,
+        initialState: "listening",
+      });
       a.setAudioLevel(level);
       advance(a, 1);
       let lo = Infinity;
@@ -143,7 +148,8 @@ describe("FillyAnimator — happy", () => {
     expect(minScaleX).toBeLessThan(0.98); // stretch in the air
     // peaks roughly BOUNCE_PERIOD apart
     const peaks: number[] = [];
-    for (let i = 1; i < ys.length - 1; i++) if (ys[i] > ys[i - 1] && ys[i] >= ys[i + 1] && ys[i] > 0.1) peaks.push(i);
+    for (let i = 1; i < ys.length - 1; i++)
+      if (ys[i] > ys[i - 1] && ys[i] >= ys[i + 1] && ys[i] > 0.1) peaks.push(i);
     expect(peaks.length).toBeGreaterThanOrEqual(2);
     expect((peaks[1] - peaks[0]) * DT).toBeCloseTo(BOUNCE_PERIOD, 1);
     expect(Math.max(...ys)).toBeLessThanOrEqual(BOUNCE_HEIGHT + 0.02);
@@ -157,13 +163,13 @@ describe("FillyAnimator — happy", () => {
     expect(p.bodyY).toBeGreaterThan(0.03);
   });
 
-  it("has a wide open smile, eyes open, full cheeks", () => {
+  it("has a wide open smile, joyful closed eyes, full cheeks", () => {
     const a = new FillyAnimator({ seed: 1, autoBlink: false });
     a.setState("happy");
     const p = advance(a, 2);
-    expect(p.mouthOpen).toBeGreaterThan(0.7);
+    expect(p.mouthOpen).toBeGreaterThan(0.6);
     expect(p.mouthSmile).toBeCloseTo(1, 1);
-    expect(p.eyeOpenL).toBeCloseTo(1, 1);
+    expect(p.eyeOpenL).toBeCloseTo(0, 1);
     expect(p.cheek).toBeCloseTo(1, 1);
   });
 });
@@ -175,11 +181,13 @@ describe("FillyAnimator — thinking", () => {
     const p = advance(a, 3);
     expect(p.eyeLookX).toBeGreaterThan(0.5);
     expect(p.eyeLookY).toBeGreaterThan(0.4);
+    expect(p.eyeWhite).toBeGreaterThan(0.2);
+    expect(p.eyeWhite).toBeLessThan(0.4);
     expect(p.mouthSmile).toBeLessThan(-0.4);
     expect(p.browL).toBeLessThan(-0.2);
     expect(p.armLChin).toBeCloseTo(1, 2);
     expect(p.bubbles).toBeCloseTo(1, 2);
-    expect(p.bodyRoll).toBeLessThan(0);
+    expect(p.bodyRoll).toBeGreaterThan(0);
   });
 });
 
@@ -199,7 +207,8 @@ describe("FillyAnimator — surprised", () => {
     expect(peakScaleY).toBeGreaterThan(1.05);
     const p = advance(a, 2);
     expect(Math.abs(p.bodyY)).toBeLessThan(0.02);
-    expect(p.eyeScale).toBeGreaterThan(1.2);
+    expect(p.eyeScale).toBeGreaterThan(1);
+    expect(p.eyeScale).toBeLessThan(1.05);
     expect(p.mouthRound).toBeCloseTo(1, 1);
     expect(p.earL).toBeGreaterThan(0.1);
     expect(p.sparks).toBeCloseTo(1, 1);
@@ -217,7 +226,8 @@ describe("FillyAnimator — sleepy", () => {
     expect(p.zzz).toBeCloseTo(1, 2);
     expect(p.earL).toBeLessThan(-0.1);
     expect(p.bodyPitch).toBeGreaterThan(0.02);
-    expect(p.mouthRound).toBeGreaterThan(0.9);
+    expect(p.mouthOpen).toBeLessThan(0.05);
+    expect(p.mouthSmile).toBeGreaterThan(0.7);
   });
 
   it("breathes slowly and deeply", () => {

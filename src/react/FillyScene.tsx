@@ -11,14 +11,16 @@ import type { FillyAnimator } from "../animation/FillyAnimator";
 import { FillyModel } from "../model/FillyModel";
 
 /** Where the camera looks (slightly below the body centre so the feet/shadow read). */
-export const CAMERA_TARGET: readonly [number, number, number] = [0, -0.06, 0];
-/** Camera sits level with the target: the illustration is a straight-on view (no box tops). */
+export const CAMERA_TARGET: readonly [number, number, number] = [0, 0.085, 0];
+/** The slight elevation reveals the pads' pillowy depth without distorting the shell. */
 /** Default camera placement — matches the reference sheet framing. */
-export const CAMERA_POSITION: readonly [number, number, number] = [0, -0.06, 7.0];
-/** Long lens: the illustration reads near-orthographic. */
-export const CAMERA_FOV = 24;
+export const CAMERA_POSITION: readonly [number, number, number] = [
+  0, 0.22, 9,
+];
+/** Long-ish lens: the illustration reads almost orthographic. */
+export const CAMERA_FOV = 16.2;
 /** Brightness of the procedural RoomEnvironment reflections. */
-export const ENVIRONMENT_INTENSITY = 0.18;
+export const ENVIRONMENT_INTENSITY = 0.42;
 
 export interface FillyFreeze {
   /** Deterministic time to step the animator to (after `reset()`). */
@@ -66,9 +68,9 @@ function useCameraAndRenderer(): void {
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
   useLayoutEffect(() => {
-    // No tone mapping: the illustration's pastel greens should come through
-    // exactly as authored (lights are kept below clipping instead).
-    gl.toneMapping = THREE.NoToneMapping;
+    // Neutral tone mapping keeps the pastel greens while rolling the broad
+    // vinyl highlights off softly instead of clipping them to flat white.
+    gl.toneMapping = THREE.NeutralToneMapping;
     gl.toneMappingExposure = 1;
     gl.outputColorSpace = THREE.SRGBColorSpace;
     camera.lookAt(TARGET);
@@ -82,7 +84,12 @@ function useCameraAndRenderer(): void {
  * the model is disposed and rebuilt on the double-invoke) and advances the
  * animator every rendered frame.
  */
-export function FillyScene({ animator, running, freeze, onReady }: FillyScenePropsInternal) {
+export function FillyScene({
+  animator,
+  running,
+  freeze,
+  onReady,
+}: FillyScenePropsInternal) {
   const scene = useThree((s) => s.scene);
   const invalidate = useThree((s) => s.invalidate);
   const modelRef = useRef<FillyModel | null>(null);
@@ -131,20 +138,41 @@ export function FillyScene({ animator, running, freeze, onReady }: FillyScenePro
       readyRef.current = true;
       // The frame is rendered synchronously after this callback; notify on the next tick.
       const notify = () => onReadyRef.current?.();
-      if (typeof requestAnimationFrame === "function") requestAnimationFrame(notify);
+      if (typeof requestAnimationFrame === "function")
+        requestAnimationFrame(notify);
       else setTimeout(notify, 0);
     }
   });
 
   return (
     <>
-      {/* Soft, almost flat light like the hero illustration: a bright sky dome,
-          a gentle key from the upper left, a little fill, a whisper of rim. */}
-      {/* three uses physical light units (a Lambert surface needs ≈π of irradiance
-          to show its full albedo), hence the intensities. */}
-      <hemisphereLight args={["#ffffff", "#bfdcc3", 2.6]} />
-      <directionalLight position={[-2.5, 4, 5]} intensity={1.45} />
-      <directionalLight position={[3, 0.5, 4]} intensity={0.45} />
+      {/* A warm key and quieter ambient fill reveal the sculpted cushions.
+          The room environment supplies broad highlights on the satin clay. */}
+      <hemisphereLight args={["#fffdf3", "#b0cba0", 0.9]} />
+      <directionalLight
+        position={[-3.5, 5, 8]}
+        color="#fffdf5"
+        intensity={2.2}
+        castShadow
+        shadow-mapSize={[512, 512]}
+        shadow-camera-left={-1.8}
+        shadow-camera-right={1.8}
+        shadow-camera-top={1.8}
+        shadow-camera-bottom={-1.8}
+        shadow-camera-near={0.5}
+        shadow-camera-far={16}
+        shadow-normalBias={0.012}
+        shadow-bias={-0.0002}
+        shadow-radius={12}
+        shadow-blurSamples={12}
+      />
+      <directionalLight position={[3, 1, 4]} color="#e7f1e7" intensity={0.45} />
+      <directionalLight position={[-1, -2, 5]} color="#e3f4cf" intensity={0.4} />
+      <directionalLight
+        position={[0, 3, -4]}
+        color="#f8ffe8"
+        intensity={0.65}
+      />
     </>
   );
 }

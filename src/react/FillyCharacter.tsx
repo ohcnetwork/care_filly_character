@@ -19,7 +19,13 @@ import {
 import { FillyAnimator } from "../animation/FillyAnimator";
 import type { FillyState } from "../core/types";
 import { useOnScreen, usePointerFollow } from "./hooks";
-import { CAMERA_FOV, CAMERA_POSITION, FillyScene, type FillyFreeze } from "./FillyScene";
+import {
+  CAMERA_FOV,
+  CAMERA_POSITION,
+  FillyScene,
+  type FillyFreeze,
+} from "./FillyScene";
+import { FillyOrbitControls } from "./FillyOrbitControls";
 
 /** Seconds the character stays `happy` after a click. */
 export const CLICK_HAPPY_SECONDS = 1.6;
@@ -35,6 +41,8 @@ export interface FillyCharacterProps {
   followPointer?: boolean;
   /** Hover → attentive, press → squash, click → short happy bounce (default true). */
   interactive?: boolean;
+  /** Drag to inspect in 3D (default false); temporarily disables pointer reactions. */
+  orbitControls?: boolean;
   /** Fired on click when `interactive`. */
   onClick?: () => void;
   className?: string;
@@ -72,13 +80,17 @@ function toCssSize(size: number | string): string {
   return typeof size === "number" ? `${size}px` : size;
 }
 
-export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterProps>(function FillyCharacter(
+export const FillyCharacter = forwardRef<
+  FillyCharacterHandle,
+  FillyCharacterProps
+>(function FillyCharacter(
   {
     state = "idle",
     audioLevel = null,
     size = 160,
     followPointer = true,
     interactive = true,
+    orbitControls = false,
     onClick,
     className,
     style,
@@ -103,7 +115,11 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
   latestStateRef.current = state;
   const frozenState = frozen ? state : null;
   const animator = useMemo(
-    () => new FillyAnimator({ seed, initialState: frozenState ?? latestStateRef.current }),
+    () =>
+      new FillyAnimator({
+        seed,
+        initialState: frozenState ?? latestStateRef.current,
+      }),
     [seed, frozenState],
   );
 
@@ -129,7 +145,11 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
     animator.setAudioLevel(audioLevel ?? null);
   }, [animator, audioLevel]);
 
-  usePointerFollow(wrapperRef, animator, followPointer && !frozen);
+  usePointerFollow(
+    wrapperRef,
+    animator,
+    followPointer && !frozen && !orbitControls,
+  );
   const onScreen = useOnScreen(wrapperRef);
   const running = !paused && onScreen && !frozen;
   // While paused/offscreen/frozen the Canvas runs in "demand" mode (not
@@ -151,9 +171,10 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
   // ── interaction ──────────────────────────────────────────────────────────
   const hint = useCallback(
     (h: "none" | "hover" | "pressed") => {
-      if (interactive && !frozen) animator.setInteractionHint(h);
+      if (interactive && !frozen && !orbitControls)
+        animator.setInteractionHint(h);
     },
-    [animator, interactive, frozen],
+    [animator, interactive, frozen, orbitControls],
   );
   const handleEnter = useCallback(() => hint("hover"), [hint]);
   const handleLeave = useCallback(() => hint("none"), [hint]);
@@ -165,7 +186,7 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
   );
   const handleUp = useCallback(() => hint("hover"), [hint]);
   const handleClick = useCallback(() => {
-    if (!interactive || frozen) return;
+    if (!interactive || frozen || orbitControls) return;
     animator.setState("happy");
     if (happyTimer.current !== null) clearTimeout(happyTimer.current);
     happyTimer.current = setTimeout(() => {
@@ -173,11 +194,16 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
       animator.setState(propStateRef.current);
     }, CLICK_HAPPY_SECONDS * 1000);
     onClick?.();
-  }, [animator, interactive, frozen, onClick]);
+  }, [animator, interactive, frozen, orbitControls, onClick]);
 
   useEffect(() => {
-    if (!interactive) animator.setInteractionHint("none");
-  }, [animator, interactive]);
+    if (!interactive || orbitControls) animator.setInteractionHint("none");
+    if (orbitControls && happyTimer.current !== null) {
+      clearTimeout(happyTimer.current);
+      happyTimer.current = null;
+      animator.setState(propStateRef.current);
+    }
+  }, [animator, interactive, orbitControls]);
 
   const handleReady = useCallback(() => {
     setReady(true);
@@ -185,7 +211,8 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
   }, [onReady]);
 
   const freeze = useMemo<FillyFreeze | undefined>(
-    () => (frozen ? { at: freezeAt, blink: freezeBlink, audioLevel } : undefined),
+    () =>
+      frozen ? { at: freezeAt, blink: freezeBlink, audioLevel } : undefined,
     [frozen, freezeAt, freezeBlink, audioLevel],
   );
 
@@ -196,8 +223,8 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
     width: css,
     height: css,
     lineHeight: 0,
-    pointerEvents: interactive ? "auto" : "none",
-    cursor: interactive ? "pointer" : undefined,
+    pointerEvents: interactive || orbitControls ? "auto" : "none",
+    cursor: orbitControls ? "grab" : interactive ? "pointer" : undefined,
     userSelect: "none",
     WebkitTapHighlightColor: "transparent",
     ...style,
@@ -218,14 +245,31 @@ export const FillyCharacter = forwardRef<FillyCharacterHandle, FillyCharacterPro
     >
       <Canvas
         gl={{ alpha: true, antialias: true, powerPreference: "low-power" }}
+        shadows="variance"
         dpr={dpr}
-        camera={{ fov: CAMERA_FOV, position: [...CAMERA_POSITION], near: 0.1, far: 50 }}
+        camera={{
+          fov: CAMERA_FOV,
+          position: [...CAMERA_POSITION],
+          near: 0.1,
+          far: 50,
+        }}
         frameloop={frozen || !running ? "demand" : "always"}
         // r3f's own wrapper div sets `pointer-events: auto`, which would undo the
         // `none` on our wrapper when not interactive; mirror it here.
-        style={{ width: "100%", height: "100%", background, pointerEvents: interactive ? "auto" : "none" }}
+        style={{
+          width: "100%",
+          height: "100%",
+          background,
+          pointerEvents: interactive || orbitControls ? "auto" : "none",
+        }}
       >
-        <FillyScene animator={animator} running={running} freeze={freeze} onReady={handleReady} />
+        <FillyScene
+          animator={animator}
+          running={running}
+          freeze={freeze}
+          onReady={handleReady}
+        />
+        {orbitControls && <FillyOrbitControls />}
       </Canvas>
     </div>
   );

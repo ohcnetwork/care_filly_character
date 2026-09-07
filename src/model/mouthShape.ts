@@ -101,7 +101,10 @@ function set(v: Vec2, x: number, y: number): void {
  * @param params pose mouth params (clamped internally)
  * @param out    optional shape to fill (no allocation when provided)
  */
-export function computeMouthShape(params: MouthParams, out: MouthShape = createMouthShape()): MouthShape {
+export function computeMouthShape(
+  params: MouthParams,
+  out: MouthShape = createMouthShape(),
+): MouthShape {
   const open = clamp01(params.open);
   const wide = Math.min(Math.max(params.wide, 0.4), 1.8);
   const smile = Math.min(Math.max(params.smile, -1), 1);
@@ -112,13 +115,14 @@ export function computeMouthShape(params: MouthParams, out: MouthShape = createM
   // ── "D" smile geometry ──────────────────────────────────────────────────
   const hwD = MOUTH_BASE_HALF_WIDTH * wide;
   const cornerY = smile * 0.035; // corners up for smile, down for frown
-  const dip = smile * 0.03; // top lip centre sinks below corners for a smile
+  const dip = smile * (closed ? 0.062 : 0.03); // closed smiles need the sheet's deeper curved arc
   const hD = open * 0.24 * (0.85 + 0.15 * wide); // interior height
   const lift = hD * 0.3; // mouth grows mostly downward, a little upward
   const tYD = cornerY - dip + lift;
   const bYD = tYD - hD;
   const cYD = cornerY + lift;
   const kxD = hwD * 0.55;
+  const kyD = Math.min(hD * 0.18, hwD * 0.2);
 
   // ── round "o" geometry ──────────────────────────────────────────────────
   const hwR = MOUTH_BASE_HALF_WIDTH * wide * 0.65;
@@ -133,7 +137,7 @@ export function computeMouthShape(params: MouthParams, out: MouthShape = createM
   const tY = lerp(tYD, rY, round);
   const bY = lerp(bYD, -rY, round);
   const kx = lerp(kxD, kxR, round);
-  const ky = lerp(0, kyR, round); // corner handles: pointed for the smile, round for "o"
+  const ky = lerp(kyD, kyR, round); // softly rounded D-smile corners → round "o"
 
   set(out.L, -hw, cY);
   set(out.R, hw, cY);
@@ -151,7 +155,7 @@ export function computeMouthShape(params: MouthParams, out: MouthShape = createM
   out.closed = closed;
   out.width = hw * 2;
   out.height = closed ? 0 : Math.max(tY - bY, 0);
-  out.lineWidth = closed ? 0.022 : 0.012;
+  out.lineWidth = closed ? 0.025 : 0.012;
 
   // Tongue: sits in the bottom of the open smile, hidden for round "o".
   // Round "o" mouths keep a hint of tongue (the sheet's surprised face has one).
@@ -167,7 +171,11 @@ export function computeMouthShape(params: MouthParams, out: MouthShape = createM
 }
 
 /** True when two param sets differ by more than `eps` in any component (NaN counts as different). */
-export function mouthParamsChanged(a: MouthParams, b: MouthParams, eps = 0.004): boolean {
+export function mouthParamsChanged(
+  a: MouthParams,
+  b: MouthParams,
+  eps = 0.004,
+): boolean {
   return (
     !(Math.abs(a.open - b.open) <= eps) ||
     !(Math.abs(a.wide - b.wide) <= eps) ||

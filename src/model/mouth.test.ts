@@ -8,7 +8,20 @@ import {
 } from "./mouthShape";
 
 function allFinite(s: MouthShape): boolean {
-  const pts = [s.L, s.T, s.R, s.B, s.LtoT, s.TfromL, s.TtoR, s.RfromT, s.RtoB, s.BfromR, s.BtoL, s.LfromB];
+  const pts = [
+    s.L,
+    s.T,
+    s.R,
+    s.B,
+    s.LtoT,
+    s.TfromL,
+    s.TtoR,
+    s.RfromT,
+    s.RtoB,
+    s.BfromR,
+    s.BtoL,
+    s.LfromB,
+  ];
   return (
     pts.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) &&
     Number.isFinite(s.width) &&
@@ -76,12 +89,12 @@ describe("computeMouthShape", () => {
     expect(s.height).toBeGreaterThan(0);
   });
 
-  it("pointed corners for the smile shape (corner handles collapse)", () => {
+  it("rounds open smile corners without changing their anchors", () => {
     const s = computeMouthShape({ open: 0.5, wide: 1, smile: 0.8, round: 0 });
     expect(s.LtoT.x).toBeCloseTo(s.L.x);
-    expect(s.LtoT.y).toBeCloseTo(s.L.y);
+    expect(s.LtoT.y).toBeGreaterThan(s.L.y);
     expect(s.RtoB.x).toBeCloseTo(s.R.x);
-    expect(s.RtoB.y).toBeCloseTo(s.R.y);
+    expect(s.RtoB.y).toBeLessThan(s.R.y);
   });
 
   it("clamps out-of-range params and stays finite", () => {
@@ -92,7 +105,10 @@ describe("computeMouthShape", () => {
 
   it("fills a provided output object without allocating a new one", () => {
     const out = createMouthShape();
-    const result = computeMouthShape({ open: 0.4, wide: 1, smile: 0.5, round: 0 }, out);
+    const result = computeMouthShape(
+      { open: 0.4, wide: 1, smile: 0.5, round: 0 },
+      out,
+    );
     expect(result).toBe(out);
     expect(allFinite(out)).toBe(true);
   });
@@ -105,6 +121,8 @@ describe("mouthParamsChanged", () => {
     expect(mouthParamsChanged(a, { ...a, open: 0.42 })).toBe(true);
     expect(mouthParamsChanged(a, { ...a, round: 0.01 })).toBe(true);
     // NaN sentinel (first paint) must count as changed.
-    expect(mouthParamsChanged(a, { open: NaN, wide: NaN, smile: NaN, round: NaN })).toBe(true);
+    expect(
+      mouthParamsChanged(a, { open: NaN, wide: NaN, smile: NaN, round: NaN }),
+    ).toBe(true);
   });
 });

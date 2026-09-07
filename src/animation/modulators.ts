@@ -16,7 +16,7 @@ const TAU = Math.PI * 2;
 
 /** Happy bounce period (seconds) and height (body radii). */
 export const BOUNCE_PERIOD = 0.7;
-export const BOUNCE_HEIGHT = 0.2;
+export const BOUNCE_HEIGHT = 0.16;
 
 /** Random glance used in idle: wait 2–5 s, look somewhere for ~1 s, return. */
 class GlanceEngine {
@@ -167,7 +167,7 @@ export class StateModulator {
         const swing = Math.sin(TAU * p); // + while rising, − while falling
         pose.bodyY += BOUNCE_HEIGHT * s * w;
         pose.bodyScaleX += (0.14 * sq - 0.06 * s) * w;
-        pose.bodyScaleY += (-0.14 * sq + 0.08 * s) * w;
+        pose.bodyScaleY += (-0.14 * sq + 0.055 * s) * w;
         pose.earL += -0.2 * swing * w;
         pose.earR += -0.2 * swing * w;
         pose.armL += 0.3 * swing * w;

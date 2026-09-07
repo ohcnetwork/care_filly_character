@@ -22,6 +22,19 @@ Status: approved-by-default (autonomous session; assumptions listed below)
 > expressions still follow the animation sheet. `src/core/palette.ts`,
 > `src/model/{geometry,limbs,face}.ts`, `src/animation/states.ts` and `src/react/FillyScene.tsx`
 > are the source of truth.
+>
+> **Reference v4 — animation sheet restored as the visual target:** the user explicitly selected
+> `reference/animation-states-sheet.png` again and asked for a close character match. The current
+> implementation therefore follows its plump ivory shell, narrower rounded sage plate, integrated
+> pale puzzle cushions, peach blush, multi-glint oval eyes, tucked limbs and rounded expression
+> shapes across all eight states. This latest direction supersedes v3's blockier hero styling.
+>
+> **Reference v5 — canonical CARE mark restored:** the official brand asset
+> `reference/care-logo-mark.svg` now outranks the generated sheet for anatomy. The face is a true
+> dark CARE plus on its exact 5 × 4 / 80-unit lattice, the two crown and two side pixels are one
+> identical module each, and the two cream square gaps remain visible as the interlocking heart /
+> digital-pixel signature. Official `#2d723f` / `#499d65` mark colors provide the hierarchy; the
+> animation sheet remains the source for the ivory shell, clay finish, face and motion.
 
 ## 1. Goal
 
@@ -52,20 +65,20 @@ runtime, since CARE deployments may be offline).
 
 ## 3. Character anatomy (from the sheet)
 
-| Part | Geometry | Colour |
-|------|----------|--------|
-| Body | sphere r=1 | mint `#dfeed3` (lighter toward top) |
-| Face plate | rounded plus/cross, recessed ~0.07 into the body front | green `#7cb069` |
-| Ear tiles ×2 | rounded boxes on top of body, flanking the plus's upper stem, raised | light green `#c3e2a8` |
-| Side tiles ×2 | rounded boxes at the plus's horizontal arms, left/right, raised | light green `#c3e2a8` |
-| Arms ×2 | small ellipsoids on lower sides, pivot at shoulder | light green `#bfe0a6` |
-| Feet ×2 | flattened ellipsoids at bottom front | light green `#bfe0a6` |
-| Eyes ×2 | spheres r≈0.13, glossy black, two white highlights fixed to view | `#141414`, highlights white |
-| Eyelid arcs | thick dark arcs shown when eyes are closed (blink `^ ^`, sleepy `︶ ︶`) | `#141414` |
-| Cheeks ×2 | flattened pink discs on the plate | `#f2b7b3` |
-| Mouth | canvas-drawn (open smile w/ tongue, closed smile, "o", frown, tiny "o") | interior `#5a1b1b`, tongue `#f08a8a` |
-| Contact shadow | soft radial-gradient plane below | black, α≈0.25 |
-| Decorations | zZ (sleepy), thought bubbles (thinking), sound waves (listening), sparks (surprised/talking) | greens |
+| Part           | Geometry                                                                                     | Colour                               |
+| -------------- | -------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Body           | sphere r=1                                                                                   | mint `#dfeed3` (lighter toward top)  |
+| Face plate     | canonical 3 × 3-module CARE plus, recessed ~0.07 into the body front                         | official dark green `#2d723f`        |
+| Ear pixels ×2  | one-module rounded squares on the top row of the CARE lattice                                | official light green `#499d65`       |
+| Side pixels ×2 | one-module rounded squares at the outer row of the CARE lattice                              | official light green `#499d65`       |
+| Arms ×2        | small ellipsoids on lower sides, pivot at shoulder                                           | light green `#bfe0a6`                |
+| Feet ×2        | flattened ellipsoids at bottom front                                                         | light green `#bfe0a6`                |
+| Eyes ×2        | spheres r≈0.13, glossy black, two white highlights fixed to view                             | `#141414`, highlights white          |
+| Eyelid arcs    | thick dark arcs shown when eyes are closed (blink `^ ^`, sleepy `︶ ︶`)                     | `#141414`                            |
+| Cheeks ×2      | flattened pink discs on the plate                                                            | `#f2b7b3`                            |
+| Mouth          | canvas-drawn (open smile w/ tongue, closed smile, "o", frown, tiny "o")                      | interior `#5a1b1b`, tongue `#f08a8a` |
+| Contact shadow | soft radial-gradient plane below                                                             | black, α≈0.25                        |
+| Decorations    | zZ (sleepy), thought bubbles (thinking), sound waves (listening), sparks (surprised/talking) | greens                               |
 
 ## 4. Architecture
 
@@ -75,7 +88,8 @@ src/
 │   ├── types.ts        FillyState, FillyPose, DEFAULT_POSE, PoseParam keys
 │   └── palette.ts      colours + material params (single source of truth)
 ├── model/
-│   ├── geometry.ts     buildBodyGeometry() (CSG plus recess, cached), tiles, limbs
+│   ├── careMark.ts     official CARE 5 × 4 module lattice, anchors and shared SDF
+│   ├── geometry.ts     buildBodyGeometry() (CSG CARE-plus recess, cached), pixels, limbs
 │   ├── face.ts         mouth canvas painter, eyelid arcs, eye rig
 │   ├── decorations.ts  zZ / bubbles / waves / sparks
 │   └── FillyModel.ts   THREE.Group subclass; applyPose(pose); dispose()
@@ -114,15 +128,15 @@ suppressed in `sleepy`) plus `animator.blink()` / `ref.blink()` trigger.
 
 ### 4.3 Per-state behaviour
 
-| State | Static target | Procedural loop |
-|-------|---------------|-----------------|
-| idle | neutral, small open smile, cheeks .6 | breathe (scaleY ±1.5 %, 0.25 Hz), slow bob, occasional glance |
-| listening | ears perk +0.25 rad, lean forward, eyes wide 1.05, closed smile, waves 1 | ear wiggle scaled by audioLevel, gentle head tilt sway |
-| talking | open smile, sparks .6 | mouthOpen from `audioLevel` (or synthetic syllable noise if none), body bob synced |
-| happy | eyes happy arcs, wide open smile, cheeks 1 | bounce: y = 0.18·|sin| , squash at ground (1.12, 0.88), stretch in air (0.94, 1.08); ears flap |
-| thinking | eyes look up-right, slight frown, armLChin 1, roll −0.08, bubbles 1 | gaze drift, bubble float |
-| surprised | eyeScale 1.25, mouth round "o", ears straight up, sparks 1 | one-shot jump + stretch on enter, then micro-tremble |
-| sleepy | eyes closed (arc −1), tiny "o", pitch +0.12, y −0.04, ears droop, zzz 1 | slow deep breathe (±3 %, 0.12 Hz), no blink |
+| State     | Static target                                                            | Procedural loop                                                                    |
+| --------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| idle      | neutral, small open smile, cheeks .6                                     | breathe (scaleY ±1.5 %, 0.25 Hz), slow bob, occasional glance                      |
+| listening | ears perk +0.25 rad, lean forward, eyes wide 1.05, closed smile, waves 1 | ear wiggle scaled by audioLevel, gentle head tilt sway                             |
+| talking   | open smile, sparks .6                                                    | mouthOpen from `audioLevel` (or synthetic syllable noise if none), body bob synced |
+| happy     | eyes happy arcs, wide open smile, cheeks 1                               | bounce: y = 0.18·                                                                  | sin | , squash at ground (1.12, 0.88), stretch in air (0.94, 1.08); ears flap |
+| thinking  | eyes look up-right, slight frown, armLChin 1, roll −0.08, bubbles 1      | gaze drift, bubble float                                                           |
+| surprised | eyeScale 1.25, mouth round "o", ears straight up, sparks 1               | one-shot jump + stretch on enter, then micro-tremble                               |
+| sleepy    | eyes closed (arc −1), tiny "o", pitch +0.12, y −0.04, ears droop, zzz 1  | slow deep breathe (±3 %, 0.12 Hz), no blink                                        |
 
 Transitions: springs (stiffness ~120–200, damping ~14–20) per param; state
 change just swaps targets. `happy` and `surprised` also fire an enter impulse.

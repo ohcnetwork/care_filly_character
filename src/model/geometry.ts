@@ -8,22 +8,23 @@
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import type { FillyMaterialKey } from "./materials";
 import { buildPlateDecalGeometry } from "./plateFallback";
+import { MASCOT_FACE, mascotFaceSdf } from "./mascotShape";
 
 /** Body sphere radius (before {@link BODY_SCALE}). */
 export const BODY_RADIUS = 1;
 /**
- * The hero illustration's body is a wide oval: the unit sphere is scaled by
- * this before the plate is cut. x is the "body unit" used by every layout
- * constant; y/z are the oblate factors.
+ * The sheet's shell is almost circular, with only a slight front-to-back and
+ * vertical squash so it still reads as a soft toy instead of a perfect ball.
  */
-export const BODY_SCALE = { x: 1, y: 0.8, z: 0.88 } as const;
+export const BODY_SCALE = { x: 1, y: 0.91, z: 0.76 } as const;
 /** Lowest point of the body ellipsoid (feet hang slightly below it). */
 export const BODY_BOTTOM = -BODY_SCALE.y;
 /** Radius of the recessed plate floor (same ellipsoid, scaled down). */
-export const PLATE_RADIUS = 0.93;
+export const PLATE_RADIUS = 0.958;
 
 /** z on the body surface (scaled ellipsoid of radius `r`) at (x, y); 0 outside. */
 export function bodyZ(x: number, y: number, r = BODY_RADIUS): number {
@@ -32,39 +33,33 @@ export function bodyZ(x: number, y: number, r = BODY_RADIUS): number {
   return r * BODY_SCALE.z * Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
 }
 
-/**
- * Face plate outline in the XY plane: a wide horizontal bar with a narrower
- * stem below it, and a NOTCH cut into the top centre between the two ear tabs
- * (the pale body shows through there — there is no dark stem going up).
- * Corners are only slightly rounded: the hero plate reads blocky.
- */
-export const PLUS_SHAPE = {
-  /** Lower stem half-width. */
-  vHalfWidth: 0.18,
-  /** Stem bottom. */
-  vBottom: -0.43,
-  /** Horizontal bar half-width (ends where the side tiles start). */
-  hHalfWidth: 0.56,
-  hBottom: -0.18,
-  hTop: 0.58,
-  /** Notch between the ears: half-width (= ears' inner edges) and depth below hTop. */
-  notchHalfWidth: 0.18,
-  notchDepth: 0.12,
-  cornerRadius: 0.025,
-} as const;
+/** The soft face insert, including the rolled seam. Shared by every attachment. */
+export function plateZ(x: number, y: number): number {
+  const inset = Math.max(0, -mascotFaceSdf(x, y));
+  return bodyZ(x, y, PLATE_RADIUS + 0.006) + 0.009 * smooth01(0, 0.035, inset);
+}
+
+/** The broad CARE-derived character face in the supplied mascot reference. */
+export const PLUS_SHAPE = MASCOT_FACE;
 
 /** Body sphere tessellation. */
 const BODY_SEGMENTS_W = 96;
 const BODY_SEGMENTS_H = 64;
 
 /**
- * Build a THREE.Shape for the plate outline (bar + stem + top notch). Corners
- * (convex and concave) are rounded with small quadratic curves.
+ * Build the reference's rounded face, lower stem and cream crown notch.
+ * The four lighter tabs remain separate articulated meshes.
  */
 export function buildRoundedPlusShape(p = PLUS_SHAPE): THREE.Shape {
-  const { vHalfWidth: vw, vBottom: vy0, hHalfWidth: hw, hBottom: hy0, hTop: hy1 } = p;
-  const nw = p.notchHalfWidth;
-  const ny = hy1 - p.notchDepth;
+  const {
+    vHalfWidth: vw,
+    vBottom: vy0,
+    hHalfWidth: hw,
+    hBottom: hy0,
+    hTop: hy1,
+    notchHalfWidth: nw,
+    notchBottom: ny,
+  } = p;
   // Counter-clockwise, starting bottom-right of the stem.
   const pts: Array<[number, number]> = [
     [vw, vy0],
@@ -92,7 +87,7 @@ export function buildRoundedPlusShape(p = PLUS_SHAPE): THREE.Shape {
     const d2x = next[0] - cur[0];
     const d2y = next[1] - cur[1];
     const l2 = Math.hypot(d2x, d2y);
-    const r = Math.min(p.cornerRadius, l1 / 2, l2 / 2);
+    const r = Math.min(i >= 4 && i <= 7 ? 0.065 : p.cornerRadius, l1 / 2, l2 / 2);
     const ax = cur[0] - (d1x / l1) * r;
     const ay = cur[1] - (d1y / l1) * r;
     const bx = cur[0] + (d2x / l2) * r;
@@ -104,7 +99,6 @@ export function buildRoundedPlusShape(p = PLUS_SHAPE): THREE.Shape {
   shape.closePath();
   return shape;
 }
-
 
 // ── baked shading ────────────────────────────────────────────────────────────
 //
@@ -143,19 +137,52 @@ export function bakeVerticalGradient(
   return geometry;
 }
 
+/** Like {@link bakeVerticalGradient}, but lets stylised shadows shift hue. */
+function bakeVerticalColorGradient(
+  geometry: THREE.BufferGeometry,
+  yMin: number,
+  yMax: number,
+  bottom: readonly [number, number, number],
+  top: readonly [number, number, number],
+): THREE.BufferGeometry {
+  const pos = geometry.getAttribute("position");
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = Math.min(1, Math.max(0, (pos.getY(i) - yMin) / (yMax - yMin)));
+    colors[i * 3] = bottom[0] + (top[0] - bottom[0]) * t;
+    colors[i * 3 + 1] = bottom[1] + (top[1] - bottom[1]) * t;
+    colors[i * 3 + 2] = bottom[2] + (top[2] - bottom[2]) * t;
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
 /** Body shading: slightly brighter crown, slightly deeper bottom. */
-const BODY_SHADE = { bottom: 0.9, top: 1.04 } as const;
+const BODY_SHADE = { bottom: 0.86, top: 1.035 } as const;
 /** Plate inner shadow: how much darker the floor gets right under the top edge, and how far it reaches. */
-const PLATE_INNER_SHADOW = { depth: 0.28, reach: 0.3 } as const;
+const PLATE_INNER_SHADOW = { depth: 0.2, reach: 0.24 } as const;
 /** Tiles / limbs: a clear top-light → bottom-shade gradient like the illustration. */
-export const TILE_SHADE = { bottom: 0.9, top: 1.1 } as const;
-export const LIMB_SHADE = { bottom: 0.84, top: 1.06 } as const;
+export const TILE_SHADE = {
+  bottom: [0.66, 0.80, 0.67],
+  top: [1.04, 1.04, 0.98],
+} as const;
+export const LIMB_SHADE = {
+  bottom: [0.78, 0.83, 0.76],
+  top: [1.02, 1.015, 1.02],
+} as const;
+const FOOT_SHADE = {
+  bottom: [0.72, 0.8, 0.7],
+  top: [0.94, 0.94, 0.94],
+} as const;
 
 /**
  * Bake the body gradient plus the plate's inner shadow. Plate-floor vertices
  * are found through the geometry groups (`slots[materialIndex] === "plate"`).
  */
-function bakeBodyShading(geometry: THREE.BufferGeometry, slots: readonly FillyMaterialKey[]): void {
+function bakeBodyShading(
+  geometry: THREE.BufferGeometry,
+  slots: readonly FillyMaterialKey[],
+): void {
   const pos = geometry.getAttribute("position");
   const colors = new Float32Array(pos.count * 3);
   const isPlate = new Uint8Array(pos.count);
@@ -168,18 +195,22 @@ function bakeBodyShading(geometry: THREE.BufferGeometry, slots: readonly FillyMa
   }
   const yMin = -BODY_SCALE.y;
   const yMax = BODY_SCALE.y;
-  const edgeTop = PLUS_SHAPE.hTop;
+  const edgeTop = PLUS_SHAPE.vTop;
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i);
     const t = Math.min(1, Math.max(0, (y - yMin) / (yMax - yMin)));
     let f = BODY_SHADE.bottom + (BODY_SHADE.top - BODY_SHADE.bottom) * t;
     if (isPlate[i]) {
       // Soft shadow cast by the rim onto the floor, strongest at the top edge.
-      f *= 1 - PLATE_INNER_SHADOW.depth * smooth01(edgeTop - PLATE_INNER_SHADOW.reach, edgeTop - 0.01, y);
+      f *=
+        1 -
+        PLATE_INNER_SHADOW.depth *
+          smooth01(edgeTop - PLATE_INNER_SHADOW.reach, edgeTop - 0.01, y);
     }
-    colors[i * 3] = f;
-    colors[i * 3 + 1] = f;
-    colors[i * 3 + 2] = f;
+    const mintBounce = isPlate[i] ? 0 : smooth01(-0.45, -BODY_SCALE.y, y);
+    colors[i * 3] = f * (1 - 0.48 * mintBounce);
+    colors[i * 3 + 1] = f * (1 - 0.09 * mintBounce);
+    colors[i * 3 + 2] = f * (1 - 0.44 * mintBounce);
   }
   geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 }
@@ -229,10 +260,18 @@ function buildBodyCSG(): BodyGeometry {
   });
   plusGeo.translate(0, 0, 0.3); // spans z 0.3 → 1.1 (through the oval's front)
   const plusBrush = new Brush(plusGeo, bodyMat);
-  const innerGeo = new THREE.SphereGeometry(PLATE_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H);
+  const innerGeo = new THREE.SphereGeometry(
+    PLATE_RADIUS,
+    BODY_SEGMENTS_W,
+    BODY_SEGMENTS_H,
+  );
   innerGeo.scale(BODY_SCALE.x, BODY_SCALE.y, BODY_SCALE.z);
   const innerBrush = new Brush(innerGeo, plateMat);
-  const bodyGeo = new THREE.SphereGeometry(BODY_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H);
+  const bodyGeo = new THREE.SphereGeometry(
+    BODY_RADIUS,
+    BODY_SEGMENTS_W,
+    BODY_SEGMENTS_H,
+  );
   bodyGeo.scale(BODY_SCALE.x, BODY_SCALE.y, BODY_SCALE.z);
   const sphereBrush = new Brush(bodyGeo, bodyMat);
   plusBrush.updateMatrixWorld();
@@ -247,8 +286,12 @@ function buildBodyCSG(): BodyGeometry {
   // body = sphere − pocket.
   const result = evaluator.evaluate(sphereBrush, pocket, SUBTRACTION);
 
-  const materials = (Array.isArray(result.material) ? result.material : [result.material]) as THREE.Material[];
-  const slots = materials.map<FillyMaterialKey>((m) => (m === plateMat ? "plate" : "body"));
+  const materials = (
+    Array.isArray(result.material) ? result.material : [result.material]
+  ) as THREE.Material[];
+  const slots = materials.map<FillyMaterialKey>((m) =>
+    m === plateMat ? "plate" : "body",
+  );
 
   const geometry = result.geometry;
   geometry.computeBoundingSphere();
@@ -268,14 +311,24 @@ function buildBodyCSG(): BodyGeometry {
 }
 
 function buildBodyFallback(): BodyGeometry {
-  const geometry = new THREE.SphereGeometry(BODY_RADIUS, BODY_SEGMENTS_W, BODY_SEGMENTS_H);
+  const geometry = new THREE.SphereGeometry(
+    BODY_RADIUS,
+    BODY_SEGMENTS_W,
+    BODY_SEGMENTS_H,
+  );
   geometry.scale(BODY_SCALE.x, BODY_SCALE.y, BODY_SCALE.z);
-  bakeVerticalGradient(geometry, -BODY_SCALE.y, BODY_SCALE.y, BODY_SHADE.bottom, BODY_SHADE.top);
+  bakeVerticalGradient(
+    geometry,
+    -BODY_SCALE.y,
+    BODY_SCALE.y,
+    BODY_SHADE.bottom,
+    BODY_SHADE.top,
+  );
   return {
     geometry,
     slots: ["body"],
     csg: false,
-    plateDecal: buildPlateDecalGeometry(BODY_RADIUS + 0.004),
+    plateDecal: buildPlateDecalGeometry(BODY_RADIUS + 0.004, 0.02, BODY_SCALE),
   };
 }
 
@@ -299,7 +352,10 @@ export function getBodyGeometry(): BodyGeometry {
 
 const geometryCache = new Map<string, THREE.BufferGeometry>();
 
-function cached<T extends THREE.BufferGeometry>(key: string, build: () => T): T {
+function cached<T extends THREE.BufferGeometry>(
+  key: string,
+  build: () => T,
+): T {
   let g = geometryCache.get(key) as T | undefined;
   if (!g) {
     g = build();
@@ -323,35 +379,75 @@ export function getRoundedBoxGeometry(
 }
 
 /**
- * Ear tab dimensions (width, height, depth, corner radius): flat blocky slabs
- * standing straight up from the bar's top edge (inner edge ≈ ±0.18).
+ * The reference stretches CARE's upper pixels into gently articulated tabs.
+ * All four use the same sculpting method and soft surface treatment.
  */
-export const EAR_TILE = { w: 0.38, h: 0.45, d: 0.24, r: 0.035 } as const;
-/** Side tile dimensions — squares butting the bar ends (flat, small radius). */
-export const SIDE_TILE = { w: 0.38, h: 0.38, d: 0.22, r: 0.035 } as const;
+export const EAR_TILE = {
+  w: 0.40,
+  h: 0.49,
+  d: 0.22,
+  // Preserve the pixel footprint while giving it the edge softness of clay.
+  r: 0.075,
+} as const;
+/** Side pixels are geometrically identical to the crown pixels. */
+export const SIDE_TILE = { w: 0.40, h: 0.44, d: 0.20, r: 0.065 } as const;
 
-export function getEarTileGeometry(): RoundedBoxGeometry {
-  return cached("earTile", () =>
-    bakeVerticalGradient(
-      new RoundedBoxGeometry(EAR_TILE.w, EAR_TILE.h, EAR_TILE.d, 5, EAR_TILE.r),
-      -EAR_TILE.h / 2,
-      EAR_TILE.h / 2,
-      TILE_SHADE.bottom,
-      TILE_SHADE.top,
-    ) as RoundedBoxGeometry,
+/**
+ * Inflate the centre of the pixel's front face. The x/y footprint stays on
+ * the CARE grid, while the changing normals give the block a soft cushion
+ * highlight even in a front-facing view. Shared by all four logo pieces.
+ */
+function buildPixelCushion(tile: { w: number; h: number; d: number; r: number }): THREE.BufferGeometry {
+  // Subdivide the ENTIRE face before sculpting. A rounded box has just two
+  // triangles across each flat face, so inflating its centre still leaves a
+  // rigid slab. A welded surface grid gives these cushions their broad dome.
+  const grid = new THREE.BoxGeometry(tile.w, tile.h, tile.d, 28, 36, 16);
+  const positions = grid.getAttribute("position");
+  const half = new THREE.Vector3(tile.w / 2, tile.h / 2, tile.d / 2);
+  const core = half.clone().addScalar(-tile.r);
+  const minCore = core.clone().negate();
+  const point = new THREE.Vector3();
+  const clamped = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+  for (let i = 0; i < positions.count; i++) {
+    point.fromBufferAttribute(positions, i);
+    clamped.copy(point).clamp(minCore, core);
+    normal.copy(point).sub(clamped).normalize();
+    point.copy(clamped).addScaledVector(normal, tile.r);
+    const dx = Math.max(0, 1 - (point.x / half.x) ** 2);
+    const dy = Math.max(0, 1 - (point.y / half.y) ** 2);
+    const front = smooth01(0, tile.d * 0.35, point.z);
+    point.z += 0.035 * dx * dy * front;
+    // Subtle outward bow along the long edges makes the tabs feel stuffed.
+    point.x *= 1 + 0.024 * dy;
+    positions.setXYZ(i, point.x, point.y, point.z);
+  }
+  grid.deleteAttribute("normal");
+  grid.deleteAttribute("uv");
+  const geometry = mergeVertices(grid, 0.00001);
+  grid.dispose();
+  geometry.computeVertexNormals();
+  const uv = new Float32Array(geometry.getAttribute("position").count * 2);
+  const pos = geometry.getAttribute("position");
+  for (let i = 0; i < pos.count; i++) {
+    uv[2 * i] = pos.getX(i) / tile.w + 0.5;
+    uv[2 * i + 1] = pos.getY(i) / tile.h + 0.5;
+  }
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return bakeVerticalColorGradient(
+    geometry, -tile.h / 2, tile.h / 2,
+    TILE_SHADE.bottom, TILE_SHADE.top,
   );
 }
 
-export function getSideTileGeometry(): RoundedBoxGeometry {
-  return cached("sideTile", () =>
-    bakeVerticalGradient(
-      new RoundedBoxGeometry(SIDE_TILE.w, SIDE_TILE.h, SIDE_TILE.d, 5, SIDE_TILE.r),
-      -SIDE_TILE.h / 2,
-      SIDE_TILE.h / 2,
-      TILE_SHADE.bottom,
-      TILE_SHADE.top,
-    ) as RoundedBoxGeometry,
-  );
+export function getEarTileGeometry(): THREE.BufferGeometry {
+  return cached("earCushion", () => buildPixelCushion(EAR_TILE));
+}
+
+export function getSideTileGeometry(): THREE.BufferGeometry {
+  return cached("sideCushion", () => buildPixelCushion(SIDE_TILE));
 }
 
 /**
@@ -360,20 +456,59 @@ export function getSideTileGeometry(): RoundedBoxGeometry {
  * `vertexColors` (eyes, cheeks, highlights) ignore it.
  */
 export function getUnitSphereGeometry(): THREE.SphereGeometry {
-  return cached("sphere:unit", () =>
-    bakeVerticalGradient(new THREE.SphereGeometry(1, 48, 32), -1, 1, LIMB_SHADE.bottom, LIMB_SHADE.top) as THREE.SphereGeometry,
+  return cached(
+    "sphere:unit",
+    () =>
+      bakeVerticalColorGradient(
+        new THREE.SphereGeometry(1, 48, 32),
+        -1,
+        1,
+        LIMB_SHADE.bottom,
+        LIMB_SHADE.top,
+      ) as THREE.SphereGeometry,
   );
 }
 
-/** Closed-eye arc: tube along a quadratic bezier, apex at y ≈ 0.065. */
+/** A little pear-shaped paw: fuller at the palm, softer at the shoulder. */
+export function getHandGeometry(): THREE.BufferGeometry {
+  return cached("hand:pear", () => {
+    const geometry = getUnitSphereGeometry().clone();
+    const positions = geometry.getAttribute("position");
+    for (let i = 0; i < positions.count; i++) {
+      const taper = 1 - 0.22 * positions.getY(i);
+      positions.setX(i, positions.getX(i) * taper);
+      positions.setZ(i, positions.getZ(i) * taper);
+    }
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return geometry;
+  });
+}
+
+/** Feet use a softer, darker gradient than the upright arms. */
+export function getFootGeometry(): THREE.SphereGeometry {
+  return cached(
+    "sphere:foot",
+    () =>
+      bakeVerticalColorGradient(
+        new THREE.SphereGeometry(1, 48, 32),
+        -1,
+        1,
+        FOOT_SHADE.bottom,
+        FOOT_SHADE.top,
+      ) as THREE.SphereGeometry,
+  );
+}
+
+/** Closed-eye arc: compact, deep curve matching the illustrated blink. */
 export function getEyeArcGeometry(): THREE.TubeGeometry {
   return cached("eyeArc", () => {
     const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(-0.12, 0, 0),
-      new THREE.Vector3(0, 0.13, 0),
-      new THREE.Vector3(0.12, 0, 0),
+      new THREE.Vector3(-0.118, 0, 0),
+      new THREE.Vector3(0, 0.18, 0),
+      new THREE.Vector3(0.118, 0, 0),
     );
-    return new THREE.TubeGeometry(curve, 24, 0.024, 10, false);
+    return new THREE.TubeGeometry(curve, 24, 0.015, 10, false);
   });
 }
 
@@ -381,11 +516,11 @@ export function getEyeArcGeometry(): THREE.TubeGeometry {
 export function getBrowGeometry(): THREE.TubeGeometry {
   return cached("brow", () => {
     const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(-0.07, 0, 0),
-      new THREE.Vector3(0, 0.045, 0),
-      new THREE.Vector3(0.07, 0, 0),
+      new THREE.Vector3(-0.044, 0, 0),
+      new THREE.Vector3(0, 0.038, 0),
+      new THREE.Vector3(0.044, 0, 0),
     );
-    return new THREE.TubeGeometry(curve, 16, 0.011, 8, false);
+    return new THREE.TubeGeometry(curve, 16, 0.009, 8, false);
   });
 }
 
@@ -393,7 +528,42 @@ export function getBrowGeometry(): THREE.TubeGeometry {
 export const MOUTH_PLANE = { w: 0.4, h: 0.325 } as const;
 
 export function getMouthPlaneGeometry(): THREE.PlaneGeometry {
-  return cached("mouthPlane", () => new THREE.PlaneGeometry(MOUTH_PLANE.w, MOUTH_PLANE.h));
+  return cached(
+    "mouthPlane",
+    () => new THREE.PlaneGeometry(MOUTH_PLANE.w, MOUTH_PLANE.h),
+  );
+}
+
+/**
+ * Smooth inset surface, fractionally smaller than the CSG opening. The CSG
+ * floor remains visible around it as a dark ambient-occlusion seam, which is
+ * the strongest depth cue in the reference render.
+ */
+export function getPlateSurfaceGeometry(): THREE.BufferGeometry {
+  return cached("plateSurface", () => {
+    const geometry = buildPlateDecalGeometry(
+      PLATE_RADIUS + 0.006,
+      0.008,
+      BODY_SCALE,
+      0.992,
+    );
+    // A smoothly rolled perimeter gives the green insert real thickness.
+    // Its outline remains inside the CARE cross; the centre rises toward
+    // the eyes while the edge tucks into the cream shell.
+    const positions = geometry.getAttribute("position");
+    for (let i = 0; i < positions.count; i++) {
+      positions.setZ(i, plateZ(positions.getX(i), positions.getY(i)));
+    }
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    return bakeVerticalColorGradient(
+      geometry,
+      PLUS_SHAPE.vBottom,
+      PLUS_SHAPE.vTop,
+      [0.85, 0.89, 0.82],
+      [0.97, 1.00, 0.93],
+    );
+  });
 }
 
 /** Dispose every cached geometry (body CSG result included). */

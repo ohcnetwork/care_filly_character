@@ -6,7 +6,7 @@ import { createCanvasSurface } from "./canvas";
 import type { FillyMaterials } from "./materials";
 
 /** Shadow plane size and height (body units). */
-export const SHADOW = { w: 2.3, h: 0.8, y: -1.02, opacity: 0.2 } as const;
+export const SHADOW = { w: 1.85, h: 0.56, y: -1.02, opacity: 0.32 } as const;
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 

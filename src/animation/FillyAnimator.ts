@@ -25,7 +25,12 @@ import { BLINK_ARC, BlinkController } from "./blink";
 import { StateModulator } from "./modulators";
 import { Rng } from "./rng";
 import { MAX_DT, POSE_SPRING_CONFIG, SPRING_PRESETS, Spring } from "./spring";
-import { POINTER_FOLLOW_WEIGHT, STATE_TARGETS, copyPose, stateEyesOpen } from "./states";
+import {
+  POINTER_FOLLOW_WEIGHT,
+  STATE_TARGETS,
+  copyPose,
+  stateEyesOpen,
+} from "./states";
 
 export type InteractionHint = "none" | "hover" | "pressed";
 
@@ -89,8 +94,12 @@ export class FillyAnimator {
       surprised: 0,
       sleepy: 0,
     };
-    this.springs = POSE_KEYS.map((k) => new Spring(STATE_TARGETS[this._state][k], POSE_SPRING_CONFIG[k]));
-    this.weights = FILLY_STATES.map((s) => new Spring(s === this._state ? 1 : 0, SPRING_PRESETS.weight));
+    this.springs = POSE_KEYS.map(
+      (k) => new Spring(STATE_TARGETS[this._state][k], POSE_SPRING_CONFIG[k]),
+    );
+    this.weights = FILLY_STATES.map(
+      (s) => new Spring(s === this._state ? 1 : 0, SPRING_PRESETS.weight),
+    );
     this.blinkCtl = new BlinkController(this.rng);
     this.modulator = new StateModulator(this.rng);
     this.snapToState();
@@ -145,8 +154,10 @@ export class FillyAnimator {
    * (+x = viewer's right, +y = up). `null` releases (gaze returns to centre).
    */
   setPointer(x: number | null, y: number | null): void {
-    const px = x === null || !Number.isFinite(x) ? 0 : x < -1 ? -1 : x > 1 ? 1 : x;
-    const py = y === null || !Number.isFinite(y) ? 0 : y < -1 ? -1 : y > 1 ? 1 : y;
+    const px =
+      x === null || !Number.isFinite(x) ? 0 : x < -1 ? -1 : x > 1 ? 1 : x;
+    const py =
+      y === null || !Number.isFinite(y) ? 0 : y < -1 ? -1 : y > 1 ? 1 : y;
     this.pointerX.target = px;
     this.pointerY.target = py;
   }
@@ -192,15 +203,33 @@ export class FillyAnimator {
       let w = ws.update(dt);
       if (w < WEIGHT_EPSILON) continue;
       if (w > 1) w = 1;
-      this.modulator.applyOverlay(st, w, this._time - this.enteredAt[st], this._time, this.audioLevel, pose);
+      this.modulator.applyOverlay(
+        st,
+        w,
+        this._time - this.enteredAt[st],
+        this._time,
+        this.audioLevel,
+        pose,
+      );
     }
 
     // 4. blink + clamp ------------------------------------------------------
-    const openness = this.blinkCtl.update(dt, this.autoBlink && state !== "sleepy");
+    const openness = this.blinkCtl.update(
+      dt,
+      this.autoBlink && state !== "sleepy",
+    );
     if (openness < 1) {
       pose.eyeOpenL *= openness;
       pose.eyeOpenR *= openness;
-      if (stateEyesOpen(state)) pose.eyeArc += (BLINK_ARC - pose.eyeArc) * (1 - openness);
+      if (stateEyesOpen(state))
+        pose.eyeArc += (BLINK_ARC - pose.eyeArc) * (1 - openness);
+      // The reference blink relaxes the open idle mouth into a small closed
+      // smile while the eyelids meet, then reopens it with the eyes.
+      if (state === "idle") {
+        pose.mouthOpen *= openness;
+        pose.mouthRound *= openness;
+        pose.mouthSmile += (1 - pose.mouthSmile) * (1 - openness);
+      }
     }
     return clampPose(pose);
   }
@@ -239,8 +268,10 @@ export class FillyAnimator {
   /** Settle every spring on the current state's static target. */
   private snapToState(): void {
     const staticTarget = STATE_TARGETS[this._state];
-    for (let i = 0; i < POSE_KEYS.length; i++) this.springs[i].snap(staticTarget[POSE_KEYS[i]]);
-    for (let i = 0; i < FILLY_STATES.length; i++) this.weights[i].snap(FILLY_STATES[i] === this._state ? 1 : 0);
+    for (let i = 0; i < POSE_KEYS.length; i++)
+      this.springs[i].snap(staticTarget[POSE_KEYS[i]]);
+    for (let i = 0; i < FILLY_STATES.length; i++)
+      this.weights[i].snap(FILLY_STATES[i] === this._state ? 1 : 0);
     this.pointerWeight.snap(POINTER_FOLLOW_WEIGHT[this._state]);
     copyPose(this._pose, staticTarget);
     copyPose(this.target, staticTarget);
@@ -270,7 +301,8 @@ export class FillyAnimator {
     const py = this.pointerY.update(dt);
     const w = this.pointerWeight.update(dt);
     if (w <= 0) return;
-    const eyeGain = POINTER_EYE_GAIN * (this.hint === "hover" ? HOVER_EYE_BOOST : 1) * w;
+    const eyeGain =
+      POINTER_EYE_GAIN * (this.hint === "hover" ? HOVER_EYE_BOOST : 1) * w;
     target.eyeLookX += px * eyeGain;
     target.eyeLookY += py * eyeGain;
     target.bodyYaw += px * POINTER_YAW_GAIN * w;
