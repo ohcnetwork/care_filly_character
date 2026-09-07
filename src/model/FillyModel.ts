@@ -205,6 +205,9 @@ export class FillyModel extends THREE.Group {
       part.castShadow = true;
       part.receiveShadow = true;
     }
+    // The soft ear roots merge into the insert; avoid a dark attachment line.
+    this.earL.tile.castShadow = this.earR.tile.castShadow = false;
+    this.earL.tile.receiveShadow = this.earR.tile.receiveShadow = false;
 
     // Shadow + decorations live outside the squash pivot.
     this.shadow = new ContactShadow(mats);

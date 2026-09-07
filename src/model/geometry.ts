@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
+import { PALETTE } from "../core/palette";
 import type { FillyMaterialKey } from "./materials";
 import { buildPlateDecalGeometry } from "./plateFallback";
 import { MASCOT_FACE, mascotFaceSdf } from "./mascotShape";
@@ -442,8 +443,84 @@ function buildPixelCushion(tile: { w: number; h: number; d: number; r: number })
   );
 }
 
-export function getEarTileGeometry(): THREE.BufferGeometry {
-  return cached("earCushion", () => buildPixelCushion(EAR_TILE));
+/**
+ * The lower cushion rolls into the face instead of ending in a rounded cap.
+ * Work in the ear's rest frame so each root meets the curved insert exactly;
+ * its buried end stays beneath the face as the existing rig bends the ear.
+ */
+export function getEarTileGeometry(restFrame?: THREE.Matrix4): THREE.BufferGeometry {
+  if (!restFrame) return cached("earCushion", () => buildPixelCushion(EAR_TILE));
+  const key = `earCushion:root:${restFrame.elements.join(":")}`;
+  return cached(key, () => {
+    const geometry = buildPixelCushion(EAR_TILE);
+    const positions = geometry.getAttribute("position");
+    const colors = geometry.getAttribute("color");
+    const cushionNormals = geometry.getAttribute("normal").clone();
+    const inverse = restFrame.clone().invert();
+    const point = new THREE.Vector3();
+    const world = new THREE.Vector3();
+    const normalBlend = new Float32Array(positions.count);
+    // Vertex colours multiply the material's linear albedo.
+    const faceColor = new THREE.Color(PALETTE.plate);
+    const tileColor = new THREE.Color(PALETTE.tile);
+    const rootColor = new THREE.Color(
+      faceColor.r / tileColor.r * 0.97,
+      faceColor.g / tileColor.g,
+      faceColor.b / tileColor.b * 0.93,
+    );
+    for (let i = 0; i < positions.count; i++) {
+      point.fromBufferAttribute(positions, i);
+      const height = point.y + EAR_TILE.h / 2;
+      const root = 1 - smooth01(0, 0.23, height);
+      const front = smooth01(-EAR_TILE.d * 0.35, EAR_TILE.d * 0.25, point.z);
+      normalBlend[i] = (1 - smooth01(0.12, 0.36, height)) * front;
+      point.y -= 0.055 * root;
+      world.copy(point).applyMatrix4(restFrame);
+      const insideFace = smooth01(0, 0.045, -mascotFaceSdf(world.x, world.y));
+      const surface = THREE.MathUtils.lerp(
+        bodyZ(world.x, world.y) + 0.006,
+        plateZ(world.x, world.y) - 0.008,
+        insideFace,
+      );
+      world.z = THREE.MathUtils.lerp(
+        world.z, surface, root * front,
+      );
+      // Cover the pale shell until the root reaches the recessed green face.
+      if (height < 0.3) {
+        world.z = THREE.MathUtils.lerp(world.z, Math.max(world.z, surface), front);
+      }
+      point.copy(world).applyMatrix4(inverse);
+      positions.setXYZ(i, point.x, point.y, point.z);
+      const tint = 1 - smooth01(0.01, 0.32, height);
+      colors.setXYZ(i,
+        THREE.MathUtils.lerp(colors.getX(i), rootColor.r, tint),
+        THREE.MathUtils.lerp(colors.getY(i), rootColor.g, tint),
+        THREE.MathUtils.lerp(colors.getZ(i), rootColor.b, tint),
+      );
+    }
+    geometry.computeVertexNormals();
+    // Continue the insert's soft lighting across the flexible join. A short
+    // geometric fillet otherwise produces a dark band on its downward slope.
+    const normals = geometry.getAttribute("normal");
+    const normal = new THREE.Vector3();
+    const surfaceNormal = new THREE.Vector3();
+    const step = 0.002;
+    for (let i = 0; i < positions.count; i++) {
+      if (normalBlend[i] === 0) continue;
+      world.fromBufferAttribute(positions, i).applyMatrix4(restFrame);
+      // Continue the crown's tangent above the shell instead of sampling its
+      // silhouette, where the ellipsoid derivative becomes discontinuous.
+      world.y = Math.min(world.y, PLUS_SHAPE.hTop);
+      const dx = (bodyZ(world.x + step, world.y) - bodyZ(world.x - step, world.y)) / (2 * step);
+      const dy = (bodyZ(world.x, world.y + step) - bodyZ(world.x, world.y - step)) / (2 * step);
+      surfaceNormal.set(-dx, -dy, 1).normalize().transformDirection(inverse);
+      normal.fromBufferAttribute(cushionNormals, i).lerp(surfaceNormal, normalBlend[i]).normalize();
+      normals.setXYZ(i, normal.x, normal.y, normal.z);
+    }
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+    return geometry;
+  });
 }
 
 export function getSideTileGeometry(): THREE.BufferGeometry {

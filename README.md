@@ -19,7 +19,8 @@ and small pear-shaped hands. The official CARE mark remains separately preserved
 
 The rebuilt cushions use welded, subdivided surfaces rather than flat box faces. Fine
 clay grain, a recessed face seam, restrained eye reflections, and soft studio shadows
-give the pieces depth. All eight expressions retain the existing animation and React API.
+give the pieces depth. The top pads taper into the face with a soft colour transition.
+All eight expressions retain the existing animation and React API.
 Look-and-feel constants live in `src/core/palette.ts`, `src/model/{geometry,limbs,face}.ts`,
 and `src/animation/states.ts`.
 

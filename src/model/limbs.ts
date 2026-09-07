@@ -32,7 +32,7 @@ export const EAR_ANCHOR = {
   orientY: 0.78,
   face: 1,
   splay: 0.035,
-  bury: 0.025,
+  bury: 0.065,
   depthOffset: 0.035,
 } as const;
 /** Side tiles: rounded cushions butting the bar ends and following the shell. */
@@ -149,7 +149,11 @@ export function buildEar(side: -1 | 1, materials: FillyMaterials): EarRig {
   group.quaternion.multiply(_qz);
   const base = group.quaternion.clone();
 
-  const tile = new THREE.Mesh(getEarTileGeometry(), materials.tile);
+  group.updateMatrix();
+  const restFrame = group.matrix.clone().multiply(
+    new THREE.Matrix4().makeTranslation(0, EAR_TILE.h / 2, -EAR_ANCHOR.bury),
+  );
+  const tile = new THREE.Mesh(getEarTileGeometry(restFrame), materials.tile);
   tile.name = "earTile";
   tile.position.set(0, EAR_TILE.h / 2, -EAR_ANCHOR.bury);
   group.add(tile);
