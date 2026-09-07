@@ -1,6 +1,6 @@
 /** The live character studio. */
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, CaretDown, Heart, SlidersHorizontal } from "@phosphor-icons/react";
+import { ArrowUpRight, CaretDown, GithubLogo, Heart, SlidersHorizontal } from "@phosphor-icons/react";
 import type { FillyState } from "../src/core/types";
 import { FillyCharacter, type FillyCharacterHandle } from "../src/react/FillyCharacter";
 import { SHEET_FRAMES, type SheetFrame } from "./frames";
@@ -55,7 +55,7 @@ export function InteractiveMode() {
         <div className="studio-intro">
           <span className="eyebrow">A LITTLE COMPANION, A LOT OF HEART</span>
           <h1 id="studio-title">Hello, I’m Filly.</h1>
-          <p>Here to listen, help, and brighten your day.</p>
+          <p>The CARE mascot from Open Healthcare Network, here to brighten your day.</p>
         </div>
         <div className="pg-stage">
           <FillyCharacter
@@ -151,7 +151,13 @@ export function InteractiveMode() {
       </section>
       <footer className="studio-footer">
         <span>Soft. Friendly. Always here.</span>
-        <span>Made with a little <Heart className="footer-heart" size={15} alt="love" /></span>
+        <div className="footer-meta">
+          <span>Made with a little <Heart className="footer-heart" size={15} alt="love" /></span>
+          <a className="footer-github" href="https://github.com/ohcnetwork/care_filly_character" target="_blank" rel="noopener noreferrer">
+            <GithubLogo size={16} aria-hidden="true" />
+            View on GitHub
+          </a>
+        </div>
       </footer>
     </main>
   );

@@ -114,8 +114,12 @@ button { cursor: pointer; }
 .voice-level output { width: 35px; text-align: right; font-variant-numeric: tabular-nums; }
 .pg-status { display: flex; justify-content: center; gap: 15px; padding-bottom: 12px; color: var(--ink-soft); font-size: 10px; font-variant-numeric: tabular-nums; }
 .pg-error { color: #a04438; font-size: 12px; }
-.studio-footer { margin-top: 38px; min-height: 72px; border-top: 1px solid #e9ecdf; font-size: 10px; color: #91a08b; }
+.studio-footer { flex-wrap: wrap; gap: 8px 20px; margin-top: 38px; min-height: 72px; padding: 14px 0; border-top: 1px solid #e9ecdf; font-size: 10px; color: #91a08b; }
 .footer-heart { color: #80a86f; vertical-align: -3px; }
+.footer-meta { display: flex; align-items: center; gap: 22px; }
+.footer-github { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; color: var(--ink-soft); font-size: 11px; font-weight: 500; text-decoration: none; }
+.footer-github:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.footer-github svg { flex-shrink: 0; }
 
 /* Reference sheet: generous portraits and pale, dashed dividers. */
 .sheet { width: min(100%, 1480px); padding: 0 40px 44px; margin: 0 auto; }
@@ -173,7 +177,9 @@ button { cursor: pointer; }
   .expression-description { font-size: 10px; }
   .studio-settings { margin-top: 19px; }
   .pg-controls { padding-left: 0; padding-right: 0; justify-content: space-between; column-gap: 8px; font-size: 11px; }
-  .studio-footer { margin-top: 25px; font-size: 9px; min-height: 64px; }
+  .studio-footer { flex-direction: column; justify-content: center; gap: 1px; margin-top: 25px; font-size: 9px; min-height: 76px; }
+  .footer-meta { gap: 16px; }
+  .footer-github { font-size: 10px; }
   .sheet { padding: 0 10px 20px; }
   .sheet-header { padding: 0 8px; min-height: 78px; }
   .sheet-cell { padding-left: 3px; padding-right: 3px; }

@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "Filly — The CARE Mascot",
+  "short_name": "Filly",
+  "description": "Explore Filly, the animated CARE mascot from Open Healthcare Network.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fcfaf6",
+  "theme_color": "#fcfaf6",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

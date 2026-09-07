@@ -10,6 +10,7 @@ import { ExportMode } from "./ExportMode";
 import { FrameMode } from "./FrameMode";
 import { InteractiveMode } from "./InteractiveMode";
 import { SheetMode } from "./SheetMode";
+import { SocialPreviewMode } from "./SocialPreviewMode";
 
 function num(v: string | null, fallback: number): number {
   if (v === null) return fallback;
@@ -19,6 +20,7 @@ function num(v: string | null, fallback: number): number {
 
 export function App() {
   const params = new URLSearchParams(window.location.search);
+  if (params.get("social") === "1") return <SocialPreviewMode />;
   if (params.get("export") === "1") return <ExportMode />;
   if (params.get("sheet") === "1") return <SheetMode cell={num(params.get("size"), 320)} />;
 

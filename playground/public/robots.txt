@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Utility views use a noindex meta tag; keep them crawlable so it can be read.
+Sitemap: https://mascot.ohc.network/sitemap.xml

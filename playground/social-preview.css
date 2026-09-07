@@ -1,0 +1,21 @@
+.social-card {
+  width: 1200px;
+  height: 630px;
+  overflow: hidden;
+  position: relative;
+  background: #fcfaf6;
+  color: #274d35;
+}
+.social-copy { position: absolute; inset: 58px auto 48px 68px; z-index: 1; }
+.social-brand { display: flex; align-items: center; gap: 15px; font-size: 15px; font-weight: 500; }
+.social-brand .care-wordmark { font-size: 18px; }
+.social-brand .brand-divider { background: #b9d0ad; }
+.social-intro { margin-top: 80px; }
+.social-kicker { margin: 0 0 19px; font-size: 11px; letter-spacing: .16em; font-weight: 700; color: #55794e; }
+.social-intro h1 { margin: 0; font-size: 87px; line-height: 1.02; letter-spacing: -.055em; font-weight: 600; }
+.social-period { color: #7db86c; }
+.social-description { margin: 22px 0 0; font-size: 21px; line-height: 1.45; color: #60735c; }
+.social-address { position: absolute; bottom: 0; display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 500; }
+.social-address svg { color: #83b66f; }
+.social-portrait { position: absolute; left: 527px; top: -26px; }
+.social-sparkle { position: absolute; right: 79px; bottom: 52px; color: #91bd7c; }

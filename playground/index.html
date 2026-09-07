@@ -3,11 +3,111 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Filly — CARE mascot playground</title>
+    <title>Filly — The CARE Mascot | Open Healthcare Network</title>
+    <meta
+      name="description"
+      content="Meet Filly, the CARE mascot from Open Healthcare Network. Explore eight animated expressions and the open-source 3D character playground."
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://mascot.ohc.network/" />
+    <meta name="theme-color" content="#fcfaf6" />
+    <meta name="color-scheme" content="light" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Filly — Open Healthcare Network" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://mascot.ohc.network/" />
+    <meta property="og:title" content="Meet Filly, the CARE mascot" />
+    <meta
+      property="og:description"
+      content="A little character with a lot of personality. Explore Filly’s eight animated expressions in the Open Healthcare Network mascot playground."
+    />
+    <meta property="og:image" content="https://mascot.ohc.network/og-filly.jpg" />
+    <meta property="og:image:secure_url" content="https://mascot.ohc.network/og-filly.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Filly, the green CARE mascot from Open Healthcare Network." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Meet Filly, the CARE mascot" />
+    <meta
+      name="twitter:description"
+      content="A little character with a lot of personality. Explore Filly’s eight animated expressions in the Open Healthcare Network mascot playground."
+    />
+    <meta name="twitter:image" content="https://mascot.ohc.network/og-filly.jpg" />
+    <meta name="twitter:image:alt" content="Filly, the green CARE mascot from Open Healthcare Network." />
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://mascot.ohc.network/#website",
+            "url": "https://mascot.ohc.network/",
+            "name": "Filly — The CARE Mascot",
+            "description": "Explore the eight animated expressions of Filly, the CARE mascot from Open Healthcare Network.",
+            "inLanguage": "en",
+            "image": "https://mascot.ohc.network/og-filly.jpg",
+            "publisher": {
+              "@type": "Organization",
+              "name": "Open Healthcare Network",
+              "url": "https://ohc.network/"
+            },
+            "about": { "@id": "https://mascot.ohc.network/#source" }
+          },
+          {
+            "@type": "SoftwareSourceCode",
+            "@id": "https://mascot.ohc.network/#source",
+            "name": "Filly — CARE mascot character",
+            "description": "An open-source animated 3D CARE mascot built with Three.js and React Three Fiber.",
+            "codeRepository": "https://github.com/ohcnetwork/care_filly_character",
+            "url": "https://github.com/ohcnetwork/care_filly_character",
+            "programmingLanguage": "TypeScript",
+            "runtimePlatform": "Web browser",
+            "license": "https://opensource.org/license/mit"
+          }
+        ]
+      }
+    </script>
+    <script>
+      // Utility views share the main page's metadata but should not be indexed.
+      const fillyParams = new URLSearchParams(window.location.search);
+      if (fillyParams.get("export") === "1" || fillyParams.get("sheet") === "1" || fillyParams.get("social") === "1" || fillyParams.has("state")) {
+        document.querySelector('meta[name="robots"]').setAttribute("content", "noindex, follow");
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <noscript>
+        <main class="pg">
+          <header class="studio-header">
+            <a class="studio-brand" href="https://ohc.network/">Open Healthcare Network</a>
+          </header>
+          <section class="character-studio studio-intro">
+            <h1>Hello, I’m Filly.</h1>
+            <p>Meet the CARE mascot, with eight expressions from a friendly wave to a sleepy smile.</p>
+            <img
+              src="/og-filly.jpg"
+              alt="Filly, the green CARE mascot from Open Healthcare Network."
+              width="1200"
+              height="630"
+              style="max-width: 100%; height: auto"
+            />
+            <p>Enable JavaScript to explore the interactive 3D character and its animations.</p>
+            <p><a href="https://github.com/ohcnetwork/care_filly_character">View Filly’s open-source code on GitHub</a></p>
+          </section>
+        </main>
+      </noscript>
+    </div>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>

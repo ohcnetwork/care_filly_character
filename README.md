@@ -217,6 +217,18 @@ is generated locally or by Cloudflare and is not committed to the repository. Th
 custom domain uses a Cloudflare-managed CNAME from `mascot` to
 `care-filly-character.pages.dev`. The site needs no runtime secrets or server.
 
+### Site metadata and sharing
+
+The canonical URL is [mascot.ohc.network](https://mascot.ohc.network/). Metadata in
+`playground/index.html` uses the static 1200 × 630 image `/og-filly.jpg` for link
+previews. Its source artwork is the `/?social=1` view, rendered at 1200 × 630;
+refresh `playground/public/og-filly.jpg` when that artwork changes.
+
+`playground/public/favicon.svg` is the source for the PNG, ICO, and Apple touch
+icons. The same public directory contains `robots.txt`, `sitemap.xml`, and
+`site.webmanifest`. Its standalone `404.html` gives unknown paths a real 404 on
+Cloudflare Pages; the existing query-based playground views still use `/`.
+
 ## License
 
 MIT
