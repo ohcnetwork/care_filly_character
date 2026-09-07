@@ -83,7 +83,7 @@ export interface FillyPose {
   mouthRound: number;
 
   // ── cheeks ──────────────────────────────────────────────────────────────
-  /** 0..1 blush intensity. */
+  /** Legacy 0..1 blush intensity; retained for compatibility, no longer rendered. */
   cheek: number;
 
   // ── decorations (opacity 0..1) ──────────────────────────────────────────

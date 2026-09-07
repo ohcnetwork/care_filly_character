@@ -13,7 +13,7 @@
 
 The geometry is **procedural** and runs offline. The current sculpt follows the supplied
 `reference/rebuild-target.png` character sheet: a pale rounded shell, a broad green face
-with a cream crown notch, pillowy top and side tabs, emerald oval eyes, peach cheeks,
+with a cream crown notch, pillowy top and side tabs, flat emerald oval eyes,
 and small pear-shaped hands. The official CARE mark remains separately preserved in
 `reference/care-logo-mark.svg`; the character is its expressive mascot adaptation.
 

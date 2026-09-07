@@ -9,7 +9,7 @@
  *   ├─ fx                decorations, follows bodyY only
  *   └─ bodyPivot         y = −1 + bodyY, squash/stretch scale (pivot at the feet)
  *      └─ bodyGroup      y = +1, pitch/yaw/roll about the body centre
- *         ├─ body, ears, side tiles, arms, feet, eyes, cheeks, mouth
+ *         ├─ body, ears, side tiles, arms, feet, eyes, mouth
  */
 import * as THREE from "three";
 import { POSE_BOUNDS, type FillyPose, type PoseKey } from "../core/types";
@@ -84,14 +84,13 @@ export interface FillyParts {
   footR: THREE.Mesh;
   eyeL: THREE.Group;
   eyeR: THREE.Group;
+  /** Legacy blush parts; retained hidden for consumers of the rig API. */
   cheekL: THREE.Mesh;
   cheekR: THREE.Mesh;
   mouth: THREE.Mesh;
   shadow: THREE.Mesh;
   decorations: THREE.Group;
 }
-
-const CHEEK_MAX_OPACITY = 1;
 
 function clampKey(key: PoseKey, v: number): number {
   const b = POSE_BOUNDS[key];
@@ -189,6 +188,7 @@ export class FillyModel extends THREE.Group {
     this.eyeR = buildEye(1, mats);
     const cheekL = buildCheek(-1, mats);
     const cheekR = buildCheek(1, mats);
+    cheekL.visible = cheekR.visible = false;
     this.mouth = new MouthDecal(mats);
     bodyGroup.add(
       this.eyeL.group,
@@ -300,10 +300,8 @@ export class FillyModel extends THREE.Group {
       clampKey("browR", pose.browR),
     );
 
-    const cheek = clampKey("cheek", pose.cheek);
-    // Blush never fully disappears below the idle level; it reads as solid pink at 1.
-    this.materials.cheek.opacity = (0.72 + 0.28 * cheek) * CHEEK_MAX_OPACITY;
-    parts.cheekL.visible = parts.cheekR.visible = cheek > 0.01;
+    // Legacy pose values must not reveal the removed blush in any expression.
+    parts.cheekL.visible = parts.cheekR.visible = false;
 
     this.mouth.update(
       clampKey("mouthOpen", pose.mouthOpen),

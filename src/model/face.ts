@@ -1,5 +1,5 @@
 /**
- * Shallow emerald eye gems, cream crescent rims, painted blush and a tiny
+ * Painted emerald eyes, cream crescent rims and a tiny
  * expressive mouth. The facial pieces follow the cushioned green insert.
  */
 import * as THREE from "three";
@@ -37,15 +37,15 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
 export const EYE = {
   x: 0.3,
   y: 0.16,
-  z: plateZ(0.3, 0.16) + 0.014,
+  z: plateZ(0.3, 0.16) + 0.004,
   radiusX: 0.121,
   radiusY: 0.157,
-  /** A low lens profile keeps the eyes seated in the face. */
-  radiusZ: 0.032,
+  /** Almost-flat colour patches sit just above the face surface. */
+  radiusZ: 0.006,
   lookX: 0.012,
   lookY: 0.011,
-  lookYaw: 0.09,
-  lookPitch: 0.08,
+  lookYaw: 0.018,
+  lookPitch: 0.016,
   hideBelow: 0.08,
   showBrows: true,
   browTilt: 0.3,
@@ -56,7 +56,7 @@ export const EYE = {
 const IRIS_CANVAS = { w: 512, h: 256 } as const;
 
 /**
- * Paint one glossy emerald gem, with a deep upper pupil and a luminous green
+ * Paint one emerald eye, with a deep upper pupil and a luminous green
  * lower iris. The sphere's forward hemisphere is centred at u=.25, v=.5.
  * Catchlights are separate shallow patches so they stay steady during gaze.
  */
@@ -82,8 +82,7 @@ export function createEyeTexture(): THREE.CanvasTexture | null {
   ctx.ellipse(cx, cy, r, r, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Broad, diffuse colour variation feels like translucent glass, rather
-  // than a hard bullseye or a photographic iris pasted onto the mascot.
+  // Soft painted colour keeps the iris expressive without a glass-lens finish.
   const glow = ctx.createRadialGradient(
     cx - r * 0.38, cy + r * 0.6, r * 0.03,
     cx - r * 0.38, cy + r * 0.6, r * 0.63,
@@ -123,11 +122,11 @@ export function ensureEyeTexture(
   return texture;
 }
 
-/** One eye, including its squashable lens and independent closed-eye stroke. */
+/** One eye, including its squashable colour patch and closed-eye stroke. */
 export interface EyeRig {
   group: THREE.Group;
   lid: THREE.Group;
-  /** Always-visible ivory crescent behind the green lens. */
+  /** Always-visible ivory crescent behind the painted green iris. */
   sclera: THREE.Mesh;
   ball: THREE.Mesh;
   highlights: [THREE.Mesh, THREE.Mesh, THREE.Mesh, THREE.Mesh];
@@ -138,11 +137,11 @@ export interface EyeRig {
   side: -1 | 1;
 }
 
-/** Build an eye from low-profile lenses, with no protruding spherical glints. */
+/** Build thin, matte eye layers with painted catchlights, seated on the face. */
 export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   const group = new THREE.Group();
   group.name = side < 0 ? "eyeL" : "eyeR";
-  placeOnPlate(group, side * EYE.x, EYE.y, 0.014);
+  placeOnPlate(group, side * EYE.x, EYE.y, 0.004);
 
   const lid = new THREE.Group();
   lid.name = "lid";
@@ -151,38 +150,38 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
 
   const outline = new THREE.Mesh(unit, materials.brow);
   outline.name = "eyeOutline";
-  outline.scale.set(0.135, 0.17, 0.026);
-  outline.position.z = -0.013;
+  outline.scale.set(0.135, 0.17, 0.004);
+  outline.position.z = -0.001;
   lid.add(outline);
 
   const sclera = new THREE.Mesh(unit, materials.eyeWhite);
   sclera.name = "sclera";
-  sclera.scale.set(0.128, 0.163, 0.025);
-  sclera.position.set(-0.004, 0, -0.007);
+  sclera.scale.set(0.128, 0.163, 0.004);
+  sclera.position.set(-0.004, 0, 0.003);
   lid.add(sclera);
 
   const ball = new THREE.Mesh(unit, materials.eye);
   ball.name = "ball";
   ball.scale.set(EYE.radiusX, EYE.radiusY, EYE.radiusZ);
-  ball.position.set(0.009, 0, 0.008);
+  ball.position.set(0.009, 0, 0.005);
   lid.add(ball);
 
   const big = new THREE.Mesh(unit, materials.eyeHighlight);
   big.name = "highlightBig";
-  big.scale.set(0.043, 0.049, 0.006);
-  big.position.set(-0.041, 0.059, 0.036);
+  big.scale.set(0.043, 0.049, 0.0008);
+  big.position.set(-0.041, 0.059, 0.012);
   const lower = new THREE.Mesh(unit, materials.eyeHighlightSoft);
   lower.name = "highlightLower";
-  lower.scale.set(0.024, 0.017, 0.003);
-  lower.position.set(0.04, -0.088, 0.034);
+  lower.scale.set(0.024, 0.017, 0.0006);
+  lower.position.set(0.04, -0.088, 0.012);
   const pin = new THREE.Mesh(unit, materials.eyeHighlight);
   pin.name = "highlightPin";
-  pin.scale.set(0.008, 0.008, 0.002);
-  pin.position.set(0.031, 0.025, 0.04);
+  pin.scale.set(0.008, 0.008, 0.0005);
+  pin.position.set(0.031, 0.025, 0.013);
   const soft = new THREE.Mesh(unit, materials.eyeHighlightSoft);
   soft.name = "highlightSoft";
-  soft.scale.set(0.022, 0.013, 0.003);
-  soft.position.set(-0.022, -0.12, 0.029);
+  soft.scale.set(0.022, 0.013, 0.0006);
+  soft.position.set(-0.022, -0.12, 0.011);
   soft.visible = false;
   lid.add(big, lower, pin, soft);
 
@@ -191,7 +190,8 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   arcMaterial.opacity = 0;
   const arc = new THREE.Mesh(getEyeArcGeometry(), arcMaterial);
   arc.name = "arc";
-  arc.position.set(0, -0.008, 0.014);
+  arc.position.set(0, -0.008, 0.005);
+  arc.scale.z = 0.25;
   arc.visible = false;
   group.add(arc);
 
@@ -239,7 +239,7 @@ export function applyEyePose(
     EYE.radiusY * pupilScale,
     EYE.radiusZ,
   );
-  eye.ball.position.set(0.009 + pupilX, pupilY, 0.008);
+  eye.ball.position.set(0.009 + pupilX, pupilY, 0.005);
   eye.ball.rotation.set(-lookY * EYE.lookPitch, lookX * EYE.lookYaw, 0);
 
   // The two cream catchlights remain fixed to the key light. Lower green
@@ -247,10 +247,10 @@ export function applyEyePose(
   const [big, lower, pin, soft] = eye.highlights;
   const gx = pupilX * whiteMix;
   const gy = pupilY * whiteMix;
-  big.position.set(-0.041 + gx, 0.059 + gy, 0.036);
-  lower.position.set(0.04 + gx, -0.088 + gy, 0.034);
-  pin.position.set(0.031 + gx, 0.025 + gy, 0.04);
-  soft.position.set(-0.022 + gx, -0.12 + gy, 0.029);
+  big.position.set(-0.041 + gx, 0.059 + gy, 0.012);
+  lower.position.set(0.04 + gx, -0.088 + gy, 0.012);
+  pin.position.set(0.031 + gx, 0.025 + gy, 0.013);
+  soft.position.set(-0.022 + gx, -0.12 + gy, 0.011);
 
   let arcScale = clamp(arc, -1, 1);
   if (Math.abs(arcScale) < 0.15) arcScale = arcScale < 0 ? -0.15 : 0.15;
@@ -303,7 +303,7 @@ function placeOnPlate(obj: THREE.Object3D, x: number, y: number, offset: number)
   obj.lookAt(scratchTarget);
 }
 
-/** Flattened cheek oval on the plate. Shares the cheek material (opacity is common). */
+/** Legacy blush geometry retained for the public rig; FillyModel keeps it hidden. */
 export function buildCheek(
   side: -1 | 1,
   materials: FillyMaterials,

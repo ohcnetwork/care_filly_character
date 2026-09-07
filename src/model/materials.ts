@@ -19,7 +19,7 @@ export interface FillyMaterials {
   limb: THREE.MeshPhysicalMaterial;
   /** Slightly deeper material used by the planted feet. */
   foot: THREE.MeshPhysicalMaterial;
-  /** Glossy black eyeballs. */
+  /** Matte emerald eye patches. */
   eye: THREE.MeshPhysicalMaterial;
   /** Soft white sclera revealed for the thinking expression. */
   eyeWhite: THREE.MeshPhysicalMaterial;
@@ -31,7 +31,7 @@ export interface FillyMaterials {
   eyeLid: THREE.MeshStandardMaterial;
   /** Eyebrow arcs. */
   brow: THREE.MeshStandardMaterial;
-  /** Soft clay blush ovals that pick up the face lighting. */
+  /** Legacy blush material; the mascot no longer displays blush. */
   cheek: THREE.MeshPhysicalMaterial;
   /** Mouth decal (canvas texture is attached per instance). */
   mouth: THREE.MeshBasicMaterial;
@@ -176,7 +176,7 @@ export function buildFillyMaterials(): FillyMaterials {
   body.emissive.set(PALETTE.body);
   body.emissiveIntensity = 0.015;
   const eye = toyMaterial(PALETTE.eye, MATERIALS.eye, "filly-eye");
-  eye.specularIntensity = 0.25;
+  eye.specularIntensity = 0.04;
 
   return {
     body,
@@ -215,9 +215,10 @@ export function buildFillyMaterials(): FillyMaterials {
     eyeWhite: toyMaterial(
       "#f6f5dc",
       {
-        roughness: 0.32,
-        clearcoat: 0.42,
-        clearcoatRoughness: 0.2,
+        roughness: 0.88,
+        clearcoat: 0,
+        clearcoatRoughness: 0.8,
+        envMapIntensity: 0,
         vertexColors: false,
       },
       "filly-eyeWhite",

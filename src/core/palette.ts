@@ -1,7 +1,7 @@
 /**
  * Colours and material parameters — the single source of truth for the look.
  * The supplied mascot sheet supplies the mint shell, forest-green face,
- * blush, and softly polished clay treatment.
+ * and softly polished clay treatment, with matte illustrated eyes.
  */
 export const PALETTE = {
   /** Warm near-white mint shell. */
@@ -15,7 +15,7 @@ export const PALETTE = {
   /** Character-only appendages stay secondary to the five logo pieces. */
   limb: "#348d4d",
   foot: "#2e8347",
-  /** Solid glossy eye — almost black with a warm green cast. */
+  /** Dark base for the matte emerald eye texture. */
   eye: "#102c18",
   /** Unused when the eye is solid; kept for the optional iris texture. */
   eyeIris: "#70bd53",
@@ -27,7 +27,7 @@ export const PALETTE = {
   /** Closed-eye arcs (blink / happy / sleepy) and (optional) eyebrows. */
   eyeLid: "#113b20",
   brow: "#113b20",
-  /** Peach-pink blush ovals from the animation sheet. */
+  /** Legacy blush colour, retained for material API compatibility. */
   cheek: "#efb795",
   mouthInner: "#102d1b",
   mouthLine: "#123d22",
@@ -72,11 +72,11 @@ export const MATERIALS = {
     sheenRoughness: 0.84,
   },
   eye: {
-    roughness: 0.3,
-    clearcoat: 0.18,
-    clearcoatRoughness: 0.18,
+    roughness: 0.86,
+    clearcoat: 0,
+    clearcoatRoughness: 0.8,
     metalness: 0,
-    envMapIntensity: 0.12,
+    envMapIntensity: 0,
   },
   cheek: {
     roughness: 0.72,
