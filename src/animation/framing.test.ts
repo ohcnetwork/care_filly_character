@@ -59,5 +59,7 @@ describe("animated character framing", () => {
     } finally {
       model.dispose();
     }
-  }, 10_000);
+  // Project every skinned vertex at every sampled frame, including on slower
+  // shared CI runners. Keep the full motion coverage instead of sampling less.
+  }, 30_000);
 });
