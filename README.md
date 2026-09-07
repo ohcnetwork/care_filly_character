@@ -5,6 +5,8 @@
 > (or any React app) as a component that idles, blinks, listens, talks, bounces, thinks,
 > gets surprised, falls asleep — and follows the cursor, GitHub-Mona style.
 
+[Playground](https://mascot.ohc.network/) · [All eight expressions](https://mascot.ohc.network/?sheet=1)
+
 <p align="center">
   <img src="screenshots/sheet.png" alt="Filly — rendered animation states" width="900" />
 </p>
@@ -195,22 +197,23 @@ Playground URLs: `/` interactive · `/?state=happy&t=1.2` deterministic frame ·
 
 ## Cloudflare Pages
 
-The playground is a static Vite site. Use these settings for a Pages project built from
-`ohcnetwork/care_filly_character`:
+The playground is a static Vite site deployed by the `care-filly-character` Pages
+project. Cloudflare builds `ohcnetwork/care_filly_character` automatically on pushes
+to `main`; GitHub Actions runs typechecking, linting, tests, and both builds.
 
 | Setting | Value |
 | --- | --- |
 | Root directory | Repository root |
 | Build command | `npm run build:playground` |
 | Build output directory | `dist-playground` |
-| Node.js version | 22.9 or newer |
-| Intended custom domain | `mascot.ohc.network` |
+| Node.js version | 22 (from `.node-version`) |
+| Custom domain | `mascot.ohc.network` |
+| Pages hostname | `care-filly-character.pages.dev` |
 
-For a local production build, run `npm ci && npm run build:playground`. Deploy the
-contents of `dist-playground`, then add `mascot.ohc.network` as the project's custom
-domain in Cloudflare Pages and complete the DNS setup shown there. Build output is
-generated locally or by CI and is not committed to the repository. The site needs no
-runtime secrets or server.
+For a local production build, run `npm ci && npm run build:playground`. Build output
+is generated locally or by Cloudflare and is not committed to the repository. The
+custom domain uses a Cloudflare-managed CNAME from `mascot` to
+`care-filly-character.pages.dev`. The site needs no runtime secrets or server.
 
 ## License
 
