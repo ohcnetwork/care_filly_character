@@ -13,16 +13,16 @@
 
 The geometry is **procedural** and runs offline. The current sculpt follows the supplied
 `reference/rebuild-target.png` character sheet: a pale rounded shell, a broad green face
-with a cream crown notch, pillowy top and side tabs, flat emerald oval eyes,
+with a cream crown notch, rounded upper horns and side ears, flat cartoon eyes,
 and small pear-shaped hands. The official CARE mark remains separately preserved in
 `reference/care-logo-mark.svg`; the character is its expressive mascot adaptation.
 
 The rebuilt cushions use welded, subdivided surfaces rather than flat box faces. Fine
-clay grain, a recessed face seam, restrained eye reflections, and soft studio shadows
-give the pieces depth. The top tabs have rounded caps, curved green undersides,
-and full rear roots that join the round head.
+clay grain, a recessed face seam, simple ink eyes, and soft studio shadows
+give the pieces depth. The horns and side ears share their borders with the face.
+The horn roots stay attached while a two-bone rig bends their upper sections.
 All eight expressions retain the existing animation and React API.
-Look-and-feel constants live in `src/core/palette.ts`, `src/model/{geometry,limbs,face}.ts`,
+Look-and-feel constants live in `src/core/palette.ts`, `src/model/{crown,sideEar,geometry,limbs,face}.ts`,
 and `src/animation/states.ts`.
 
 ---

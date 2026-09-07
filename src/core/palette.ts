@@ -7,16 +7,16 @@ export const PALETTE = {
   /** Warm near-white mint shell. */
   body: "#d9efc3",
   /** Deep green face insert from the mascot reference. */
-  plate: "#287d43",
+  plate: "#237a43",
   /** Dark ambient-occlusion seam just inside the shell opening. */
   plateShadow: "#205831",
   /** Soft green articulated pixel cushions. */
-  tile: "#73af6d",
+  tile: "#6fab72",
   /** Character-only appendages stay secondary to the five logo pieces. */
   limb: "#348d4d",
   foot: "#2e8347",
-  /** Dark base for the matte emerald eye texture. */
-  eye: "#102c18",
+  /** Solid forest ink for the cartoon eyes. */
+  eye: "#123b28",
   /** Unused when the eye is solid; kept for the optional iris texture. */
   eyeIris: "#70bd53",
   eyeIrisEdge: "#1f7a3a",

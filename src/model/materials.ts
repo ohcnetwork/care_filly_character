@@ -19,9 +19,9 @@ export interface FillyMaterials {
   limb: THREE.MeshPhysicalMaterial;
   /** Slightly deeper material used by the planted feet. */
   foot: THREE.MeshPhysicalMaterial;
-  /** Matte emerald eye patches. */
-  eye: THREE.MeshPhysicalMaterial;
-  /** Soft white sclera revealed for the thinking expression. */
+  /** Flat cartoon ink; physical material overrides remain supported. */
+  eye: THREE.MeshBasicMaterial | THREE.MeshPhysicalMaterial;
+  /** Optional illustrated-eye rim; hidden for the default cartoon eyes. */
   eyeWhite: THREE.MeshPhysicalMaterial;
   /** Unlit white eye highlight (big, upper-left). */
   eyeHighlight: THREE.MeshBasicMaterial;
@@ -175,8 +175,11 @@ export function buildFillyMaterials(): FillyMaterials {
   // Keep the pale shell luminous without washing out its rounded form.
   body.emissive.set(PALETTE.body);
   body.emissiveIntensity = 0.015;
-  const eye = toyMaterial(PALETTE.eye, MATERIALS.eye, "filly-eye");
-  eye.specularIntensity = 0.04;
+  const eye = new THREE.MeshBasicMaterial({
+    color: PALETTE.eye,
+    toneMapped: false,
+    name: "filly-eye",
+  });
 
   return {
     body,

@@ -8,10 +8,10 @@ export const MASCOT_FACE = Object.freeze({
   vHalfWidth: 0.185,
   vBottom: -0.55,
   vTop: 0.68,
-  hHalfWidth: 0.55,
+  hHalfWidth: 0.54,
   hBottom: -0.29,
   hTop: 0.68,
-  notchHalfWidth: 0.15,
+  notchHalfWidth: 0.14,
   notchBottom: 0.49,
   cornerRadius: 0.075,
 });
@@ -35,5 +35,17 @@ export function mascotFaceSdf(x: number, y: number): number {
     p.vBottom, p.hBottom + 0.2, p.cornerRadius);
   const notch = roundedBox(x, y, -p.notchHalfWidth, p.notchHalfWidth,
     p.notchBottom, 1.2, 0.065);
+  // The bar rolls into the stem through a concave quarter-circle. A plain
+  // union of boxes leaves a square elbow here, so its decal would disagree
+  // with the rounded CSG pocket and develop a false internal edge.
+  const ax = Math.abs(x);
+  const radius = p.cornerRadius;
+  if (ax > p.vHalfWidth - radius && ax < p.vHalfWidth + radius &&
+    y > p.hBottom - radius && y < p.hBottom + radius) {
+    return radius - Math.hypot(
+      ax - (p.vHalfWidth + radius),
+      y - (p.hBottom - radius),
+    );
+  }
   return Math.max(Math.min(face, stem), -notch);
 }

@@ -66,7 +66,7 @@ export interface FillyPose {
   eyeLookY: number;
   /** Uniform eye scale; >1 = wide (surprised). */
   eyeScale: number;
-  /** 0 = glossy black jewel eye, 1 = white sclera with a small pupil (thinking). */
+  /** 0..1 curious-eye emphasis: slight squash and a wider gaze range (thinking). */
   eyeWhite: number;
   /** Brow tilt hint (−1 worried/inner-up .. +1 angry/inner-down); subtle lid rotation. */
   browL: number;

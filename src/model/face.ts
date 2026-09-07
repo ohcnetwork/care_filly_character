@@ -1,5 +1,5 @@
 /**
- * Painted emerald eyes, cream crescent rims and a tiny
+ * Flat cartoon eyes, expressive blink curves and a tiny
  * expressive mouth. The facial pieces follow the cushioned green insert.
  */
 import * as THREE from "three";
@@ -9,7 +9,9 @@ import {
   BODY_SCALE,
   bodyZ,
   getBrowGeometry,
+  getCartoonEyeGeometry,
   getEyeArcGeometry,
+  getEyePatchGeometry,
   getMouthPlaneGeometry,
   getUnitSphereGeometry,
   MOUTH_PLANE,
@@ -35,11 +37,11 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
 
 /** Eye layout, measured against the supplied character sheet. */
 export const EYE = {
-  x: 0.3,
-  y: 0.16,
-  z: plateZ(0.3, 0.16) + 0.004,
-  radiusX: 0.121,
-  radiusY: 0.157,
+  x: 0.265,
+  y: 0.12,
+  z: plateZ(0.265, 0.12) + 0.004,
+  radiusX: 0.125,
+  radiusY: 0.15,
   /** Almost-flat colour patches sit just above the face surface. */
   radiusZ: 0.006,
   lookX: 0.012,
@@ -49,7 +51,7 @@ export const EYE = {
   hideBelow: 0.08,
   showBrows: true,
   browTilt: 0.3,
-  browY: 0.28,
+  browY: 0.23,
   browLift: 0.14,
 } as const;
 
@@ -74,9 +76,9 @@ export function createEyeTexture(): THREE.CanvasTexture | null {
   const iris = ctx.createLinearGradient(0, cy - r, 0, cy + r);
   iris.addColorStop(0, "#123e21");
   iris.addColorStop(0.3, "#225a2b");
-  iris.addColorStop(0.53, "#389b42");
-  iris.addColorStop(0.76, "#55a64f");
-  iris.addColorStop(1, "#95cd79");
+  iris.addColorStop(0.53, "#32713c");
+  iris.addColorStop(0.76, "#508f49");
+  iris.addColorStop(1, "#8abb70");
   ctx.fillStyle = iris;
   ctx.beginPath();
   ctx.ellipse(cx, cy, r, r, 0, 0, Math.PI * 2);
@@ -87,7 +89,7 @@ export function createEyeTexture(): THREE.CanvasTexture | null {
     cx - r * 0.38, cy + r * 0.6, r * 0.03,
     cx - r * 0.38, cy + r * 0.6, r * 0.63,
   );
-  glow.addColorStop(0, "rgba(156, 210, 116, 0.35)");
+  glow.addColorStop(0, "rgba(156, 210, 116, 0.22)");
   glow.addColorStop(1, "rgba(81, 144, 55, 0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
@@ -103,7 +105,7 @@ export function createEyeTexture(): THREE.CanvasTexture | null {
   pupil.addColorStop(1, "#154b24");
   ctx.fillStyle = pupil;
   ctx.beginPath();
-  ctx.ellipse(cx + r * 0.12, cy - r * 0.27, r * 0.55, r * 0.59, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + r * 0.08, cy - r * 0.19, r * 0.69, r * 0.72, 0, 0, Math.PI * 2);
   ctx.fill();
   texture.needsUpdate = true;
   return texture;
@@ -126,7 +128,7 @@ export function ensureEyeTexture(
 export interface EyeRig {
   group: THREE.Group;
   lid: THREE.Group;
-  /** Always-visible ivory crescent behind the painted green iris. */
+  /** Optional ivory rim, hidden for the default cartoon style. */
   sclera: THREE.Mesh;
   ball: THREE.Mesh;
   highlights: [THREE.Mesh, THREE.Mesh, THREE.Mesh, THREE.Mesh];
@@ -137,7 +139,7 @@ export interface EyeRig {
   side: -1 | 1;
 }
 
-/** Build thin, matte eye layers with painted catchlights, seated on the face. */
+/** Build soft ink beans with one generous drawn highlight. */
 export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   const group = new THREE.Group();
   group.name = side < 0 ? "eyeL" : "eyeR";
@@ -147,37 +149,43 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   lid.name = "lid";
   group.add(lid);
   const unit = getUnitSphereGeometry();
+  const illustrated = materials.eye.map !== null;
+  const patch = illustrated ? unit : getEyePatchGeometry();
 
   const outline = new THREE.Mesh(unit, materials.brow);
   outline.name = "eyeOutline";
-  outline.scale.set(0.135, 0.17, 0.004);
+  outline.scale.set(0.144, 0.17, 0.004);
   outline.position.z = -0.001;
+  outline.visible = illustrated;
   lid.add(outline);
 
   const sclera = new THREE.Mesh(unit, materials.eyeWhite);
   sclera.name = "sclera";
-  sclera.scale.set(0.128, 0.163, 0.004);
-  sclera.position.set(-0.004, 0, 0.003);
+  sclera.scale.set(0.139, 0.164, 0.004);
+  sclera.position.set(-0.001, 0, 0.003);
+  sclera.visible = illustrated;
   lid.add(sclera);
 
-  const ball = new THREE.Mesh(unit, materials.eye);
+  const ball = new THREE.Mesh(illustrated ? unit : getCartoonEyeGeometry(side), materials.eye);
   ball.name = "ball";
   ball.scale.set(EYE.radiusX, EYE.radiusY, EYE.radiusZ);
   ball.position.set(0.009, 0, 0.005);
   lid.add(ball);
 
-  const big = new THREE.Mesh(unit, materials.eyeHighlight);
+  const big = new THREE.Mesh(patch, materials.eyeHighlight);
   big.name = "highlightBig";
-  big.scale.set(0.043, 0.049, 0.0008);
+  big.scale.set(0.04, 0.045, 0.0008);
   big.position.set(-0.041, 0.059, 0.012);
   const lower = new THREE.Mesh(unit, materials.eyeHighlightSoft);
   lower.name = "highlightLower";
   lower.scale.set(0.024, 0.017, 0.0006);
   lower.position.set(0.04, -0.088, 0.012);
+  lower.visible = illustrated;
   const pin = new THREE.Mesh(unit, materials.eyeHighlight);
   pin.name = "highlightPin";
   pin.scale.set(0.008, 0.008, 0.0005);
   pin.position.set(0.031, 0.025, 0.013);
+  pin.visible = illustrated;
   const soft = new THREE.Mesh(unit, materials.eyeHighlightSoft);
   soft.name = "highlightSoft";
   soft.scale.set(0.022, 0.013, 0.0006);
@@ -197,7 +205,7 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
 
   const brow = new THREE.Mesh(getBrowGeometry(), materials.brow);
   brow.name = "brow";
-  brow.scale.set(0.65, 0.8, 0.8);
+  brow.scale.set(0.95, 1, 0.8);
   placeOnPlate(brow, side * EYE.x, EYE.y + EYE.browY, 0.013);
   // Preserve the eyebrow's surface placement when adding it under the eye.
   group.updateMatrixWorld(true);
@@ -227,10 +235,10 @@ export function applyEyePose(
   const whiteMix = clamp(white, 0, 1);
   eye.group.scale.setScalar(scale);
   eye.lid.visible = openness > EYE.hideBelow;
+  eye.lid.scale.x = 1 + 0.12 * (1 - openness);
   eye.lid.scale.y = Math.max(openness, 0.02);
 
-  // Thinking reveals a little more ivory at the lower edge; the eyes retain
-  // their large green iris instead of becoming tiny pupils in white balls.
+  // Thinking adds a small gaze shift and squash to the drawn eye shapes.
   const pupilScale = 1 - whiteMix * 0.07;
   const pupilX = lookX * (EYE.lookX + whiteMix * 0.008);
   const pupilY = lookY * (EYE.lookY + whiteMix * 0.014);
@@ -242,8 +250,8 @@ export function applyEyePose(
   eye.ball.position.set(0.009 + pupilX, pupilY, 0.005);
   eye.ball.rotation.set(-lookY * EYE.lookPitch, lookX * EYE.lookYaw, 0);
 
-  // The two cream catchlights remain fixed to the key light. Lower green
-  // reflections are quiet accents rather than additional white bubbles.
+  // A single drawn dot stays steady while the oval follows the gaze.
+  // Extra accents remain available for the optional illustrated style.
   const [big, lower, pin, soft] = eye.highlights;
   const gx = pupilX * whiteMix;
   const gy = pupilY * whiteMix;
@@ -255,6 +263,7 @@ export function applyEyePose(
   let arcScale = clamp(arc, -1, 1);
   if (Math.abs(arcScale) < 0.15) arcScale = arcScale < 0 ? -0.15 : 0.15;
   eye.arc.scale.y = arcScale;
+  eye.arc.scale.x = 1 + 0.1 * Math.max(0, arcScale) * (1 - openness);
   const arcOpacity = 1 - smoothstep(0.05, 0.25, openness);
   eye.arcMaterial.opacity = arcOpacity;
   eye.arc.visible = arcOpacity > 0.01;

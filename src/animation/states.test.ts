@@ -207,8 +207,9 @@ describe("FillyAnimator — surprised", () => {
     expect(peakScaleY).toBeGreaterThan(1.05);
     const p = advance(a, 2);
     expect(Math.abs(p.bodyY)).toBeLessThan(0.02);
-    expect(p.eyeScale).toBeGreaterThan(1);
-    expect(p.eyeScale).toBeLessThan(1.05);
+    // Cartoon surprise should visibly open the eyes wider than the idle pose.
+    expect(p.eyeScale).toBeGreaterThan(1.1);
+    expect(p.eyeScale).toBeLessThan(1.2);
     expect(p.mouthRound).toBeCloseTo(1, 1);
     expect(p.earL).toBeGreaterThan(0.1);
     expect(p.sparks).toBeCloseTo(1, 1);

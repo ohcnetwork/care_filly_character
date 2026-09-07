@@ -15,10 +15,10 @@ export const CAMERA_TARGET: readonly [number, number, number] = [0, 0.085, 0];
 /** The slight elevation reveals the pads' pillowy depth without distorting the shell. */
 /** Default camera placement — matches the reference sheet framing. */
 export const CAMERA_POSITION: readonly [number, number, number] = [
-  0, 0.22, 9,
+  0, 1.885, 30,
 ];
-/** Long-ish lens: the illustration reads almost orthographic. */
-export const CAMERA_FOV = 16.2;
+/** A long lens keeps the illustration's compact, nearly orthographic proportions. */
+export const CAMERA_FOV = 5.08;
 /** Brightness of the procedural RoomEnvironment reflections. */
 export const ENVIRONMENT_INTENSITY = 0.42;
 

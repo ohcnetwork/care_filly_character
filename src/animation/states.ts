@@ -15,6 +15,9 @@ import {
 /** Relaxed, closed smile from the character reference. */
 const IDLE: Readonly<FillyPose> = Object.freeze({
   ...DEFAULT_POSE,
+  bodyRoll: -0.018,
+  earL: 0.025,
+  earR: 0.065,
   mouthOpen: 0,
   mouthSmile: 0.9,
 });
@@ -82,7 +85,7 @@ const THINKING: Readonly<FillyPose> = Object.freeze({
 
 const SURPRISED: Readonly<FillyPose> = Object.freeze({
   ...DEFAULT_POSE,
-  eyeScale: 1.02,
+  eyeScale: 1.16,
   eyeOpenL: 1,
   eyeOpenR: 1,
   eyeLookX: 0,

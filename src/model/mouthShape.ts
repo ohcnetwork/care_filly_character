@@ -115,7 +115,7 @@ export function computeMouthShape(
   // ── "D" smile geometry ──────────────────────────────────────────────────
   const hwD = MOUTH_BASE_HALF_WIDTH * wide;
   const cornerY = smile * 0.035; // corners up for smile, down for frown
-  const dip = smile * (closed ? 0.062 : 0.03); // closed smiles need the sheet's deeper curved arc
+  const dip = smile * (closed ? 0.074 : 0.03); // a small, rounded U keeps the resting smile warm
   const hD = open * 0.24 * (0.85 + 0.15 * wide); // interior height
   const lift = hD * 0.3; // mouth grows mostly downward, a little upward
   const tYD = cornerY - dip + lift;

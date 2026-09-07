@@ -5,14 +5,14 @@
 import * as THREE from "three";
 import {
   BODY_BOTTOM,
-  EAR_TILE,
-  bodyZ,
   getEarTileGeometry,
+  getCrownBorderGeometry,
   getFootGeometry,
   getHandGeometry,
   getSideTileGeometry,
+  getSideBorderGeometry,
 } from "./geometry";
-import { MASCOT_FACE } from "./mascotShape";
+import { CROWN, crownSurfaceZ } from "./crown";
 import type { FillyMaterials } from "./materials";
 
 // ── layout constants (body units; x = body half-width) ──────────────────────
@@ -21,47 +21,25 @@ import type { FillyMaterials } from "./materials";
 // (BODY_SCALE), blocky tabs/tiles that face the viewer straight on, chunky
 // arms and feet.
 
-/**
- * Ear tabs: inflated slabs that emerge from the upper shell and lean back
- * with its curvature. The pivot remains at the tile's lower edge so listening
- * and sleepy poses still feel organic.
- */
-export const EAR_ANCHOR = {
-  x: 0.34,
-  baseY: MASCOT_FACE.hTop - 0.10,
-  orientY: 0.78,
-  face: 0.65,
-  splay: 0.035,
-  bury: 0.045,
-  depthOffset: 0.035,
-} as const;
-/** Side tiles: rounded cushions butting the bar ends and following the shell. */
-export const SIDE_ANCHOR = {
-  x: MASCOT_FACE.hHalfWidth + 0.19,
-  y: 0.31,
-  // Keep the entire canonical square in front of the curved shell. A smaller
-  // lift lets the sphere occlude the inner corners and turns the logo pixels
-  // into crescent-shaped cushions in front view.
-  depthOffset: 0.16,
-  face: 1,
-} as const;
+/** The horn base stays fixed; the upper section bends around this pivot. */
+export const EAR_ANCHOR = { x: CROWN.centerX, baseY: 0.70 } as const;
 /** Arms: plump ellipsoids hung low on the sides, tilted gently outward. */
 export const SHOULDER = { x: 0.68, y: -0.12, z: 0.57 } as const;
-export const HAND_REST = { x: 0.15, y: -0.26, z: 0.04 } as const;
+export const HAND_REST = { x: 0.14, y: -0.22, z: 0.04 } as const;
 /** Resting tilt of the arm (radians, top toward the body). */
 export const ARM_TILT = 0.18;
 /** Hand-to-chin position, in body coordinates, beneath the little smile. */
 export const HAND_CHIN = { x: -0.1, y: -0.35, z: 0.91 } as const;
 /** Sleepy hand rests against the outer cheek, above the thinking chin pose. */
 export const HAND_CHEEK = { x: -0.45, y: -0.05, z: 0.82 } as const;
-export const HAND_SCALE = { x: 0.125, y: 0.195, z: 0.14 } as const;
+export const HAND_SCALE = { x: 0.125, y: 0.175, z: 0.14 } as const;
 /** Feet: small, diagonally placed ovals tucked into the lower shell. */
 export const FOOT = {
-  x: 0.43,
-  y: -0.75,
-  z: 0.42,
-  sx: 0.19,
-  sy: 0.11,
+  x: 0.45,
+  y: -0.732,
+  z: 0.40,
+  sx: 0.18,
+  sy: 0.135,
   sz: 0.225,
   tilt: 0.34,
 } as const;
@@ -116,10 +94,11 @@ export function placeSurfaceFrame(
   obj.quaternion.setFromRotationMatrix(_m);
 }
 
-/** Ear: group pivoting at the tile's bottom edge on the sphere surface. */
+/** Horn: a fixed root with a softly bending upper section. */
 export interface EarRig {
   group: THREE.Group;
-  tile: THREE.Mesh;
+  tile: THREE.SkinnedMesh;
+  tip: THREE.Bone;
   /** Rest orientation; pose rotations are applied on top. */
   base: THREE.Quaternion;
   side: -1 | 1;
@@ -129,49 +108,35 @@ export function buildEar(side: -1 | 1, materials: FillyMaterials): EarRig {
   const group = new THREE.Group();
   group.name = side < 0 ? "earL" : "earR";
   const x = side * EAR_ANCHOR.x;
-  // Orient from a point around the tile's centre, then move the pivot to its
-  // bottom edge. This follows the round shell without making the front face
-  // look sharply foreshortened.
-  placeSurfaceFrame(
-    group,
-    x,
-    EAR_ANCHOR.orientY,
-    bodyZ(x, EAR_ANCHOR.orientY),
-    1,
-    EAR_ANCHOR.face,
-  );
-  group.position.set(
-    x,
-    EAR_ANCHOR.baseY,
-    bodyZ(x, EAR_ANCHOR.baseY) + EAR_ANCHOR.depthOffset,
-  );
-  _qz.setFromAxisAngle(Z_AXIS, -side * EAR_ANCHOR.splay);
-  group.quaternion.multiply(_qz);
-  const base = group.quaternion.clone();
+  const root = new THREE.Bone();
+  root.name = "hornRoot";
+  const tip = new THREE.Bone();
+  tip.name = "hornTip";
+  tip.position.set(x, EAR_ANCHOR.baseY, crownSurfaceZ(x, EAR_ANCHOR.baseY) - 0.08);
+  root.add(tip);
 
-  group.updateMatrix();
-  const restFrame = group.matrix.clone().multiply(
-    new THREE.Matrix4().makeTranslation(0, EAR_TILE.h / 2, -EAR_ANCHOR.bury),
-  );
-  const tile = new THREE.Mesh(getEarTileGeometry(restFrame), materials.tile);
+  const tile = new THREE.SkinnedMesh(getEarTileGeometry(side), materials.tile);
   tile.name = "earTile";
-  tile.position.set(0, EAR_TILE.h / 2, -EAR_ANCHOR.bury);
-  group.add(tile);
-  return { group, tile, base, side };
+  tile.add(root);
+  const skeleton = new THREE.Skeleton([root, tip]);
+  tile.bind(skeleton);
+  // Skinning moves the tip beyond its rest sphere; the mascot is small and
+  // always visible together, so a stale bound must not clip a bending horn.
+  tile.frustumCulled = false;
+  const border = new THREE.Mesh(getCrownBorderGeometry(side), materials.plateShadow);
+  border.name = "hornBorder";
+  group.add(tile, border);
+  return { group, tile, tip, base: tip.quaternion.clone(), side };
 }
 
-/**
- * Rotate an ear about its base: + perk (tips forward/upright), − droop (lies
- * back). Both lean slightly OUTWARD so the ears never collide and a sleepy
- * droop reads as "softening", not as folding onto the head. Allocation-free.
- */
+/** Bend the horn above its fixed border: + perks forward, − relaxes back. */
 export function applyEarPose(ear: EarRig, angle: number): void {
   _qx.setFromAxisAngle(X_AXIS, angle * EAR_TILT_X);
   _qz.setFromAxisAngle(
     Z_AXIS,
     -ear.side * Math.abs(angle) * (angle > 0 ? EAR_SWING_OUT : EAR_SWING_IN),
   );
-  ear.group.quaternion.copy(ear.base).multiply(_qx).multiply(_qz);
+  ear.tip.quaternion.copy(ear.base).multiply(_qx).multiply(_qz);
 }
 
 /** Static side tile at the end of the plus's horizontal arm. */
@@ -179,22 +144,11 @@ export function buildSideTile(
   side: -1 | 1,
   materials: FillyMaterials,
 ): THREE.Mesh {
-  const tile = new THREE.Mesh(getSideTileGeometry(), materials.tile);
+  const tile = new THREE.Mesh(getSideTileGeometry(side), materials.tile);
   tile.name = side < 0 ? "sideL" : "sideR";
-  const x = side * SIDE_ANCHOR.x;
-  const z = bodyZ(x, SIDE_ANCHOR.y);
-  placeSurfaceFrame(
-    tile,
-    x,
-    SIDE_ANCHOR.y,
-    z,
-    1 + SIDE_ANCHOR.depthOffset,
-    SIDE_ANCHOR.face,
-  );
-  // `placeSurfaceFrame` normalizes its input for articulated limbs. Restore
-  // the exact CARE grid x/y here and use depth only to lift the full square
-  // above the shell instead of letting the sphere crop it into a wedge.
-  tile.position.set(x, SIDE_ANCHOR.y, z + SIDE_ANCHOR.depthOffset);
+  const border = new THREE.Mesh(getSideBorderGeometry(side), materials.plateShadow);
+  border.name = "sideEarBorder";
+  tile.add(border);
   return tile;
 }
 
@@ -258,7 +212,13 @@ export function applyArmPose(
   arm.group.position.x = arm.side * (SHOULDER.x + spread * swingWeight);
   arm.group.position.y = SHOULDER.y + 0.045 * celebration * swingWeight;
   arm.group.rotation.z = arm.side * raise * swingWeight;
-  arm.hand.position.copy(arm.rest).lerp(arm.chin, chin).lerp(arm.cheek, cheek);
+  // Tuck the idle hands into the shell, then extend their reach smoothly as
+  // they lift. Chin/cheek targets remain fixed after this free-arm extension.
+  const reach = THREE.MathUtils.smoothstep(raise, 0.3, 1.5);
+  arm.hand.position.copy(arm.rest);
+  arm.hand.position.x += arm.side * 0.01 * reach;
+  arm.hand.position.y -= 0.04 * reach;
+  arm.hand.position.lerp(arm.chin, chin).lerp(arm.cheek, cheek);
   const restAngle = arm.side * (ARM_TILT - raise * 0.42);
   const chinAngle = arm.side * 0.8;
   const cheekAngle = arm.side * 1.15;

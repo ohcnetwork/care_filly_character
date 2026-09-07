@@ -8,10 +8,10 @@
  */
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
 import type { FillyMaterialKey } from "./materials";
-import { PALETTE } from "../core/palette";
+import { CROWN, buildCrownHornGeometry, crownBaseY, crownSurfaceZ } from "./crown";
+import { SIDE_EAR, buildSideEarGeometry, buildSideEarCutoutShape } from "./sideEar";
 import { buildPlateDecalGeometry } from "./plateFallback";
 import { MASCOT_FACE, mascotFaceSdf } from "./mascotShape";
 
@@ -21,7 +21,7 @@ export const BODY_RADIUS = 1;
  * The sheet's shell is almost circular, with only a slight front-to-back and
  * vertical squash so it still reads as a soft toy instead of a perfect ball.
  */
-export const BODY_SCALE = { x: 1, y: 0.91, z: 0.76 } as const;
+export const BODY_SCALE = { x: 1, y: 0.87, z: 0.76 } as const;
 /** Lowest point of the body ellipsoid (feet hang slightly below it). */
 export const BODY_BOTTOM = -BODY_SCALE.y;
 /** Radius of the recessed plate floor (same ellipsoid, scaled down). */
@@ -37,7 +37,11 @@ export function bodyZ(x: number, y: number, r = BODY_RADIUS): number {
 /** The soft face insert, including the rolled seam. Shared by every attachment. */
 export function plateZ(x: number, y: number): number {
   const inset = Math.max(0, -mascotFaceSdf(x, y));
-  return bodyZ(x, y, PLATE_RADIUS + 0.006) + 0.009 * smooth01(0, 0.035, inset);
+  const surface = bodyZ(x, y, PLATE_RADIUS + 0.006) + 0.009 * smooth01(0, 0.035, inset);
+  // Horn and forehead share a surface at the border. There is no separate
+  // ledge or curled underside between the two colours.
+  const join = smooth01(0.38, 0.54, y);
+  return THREE.MathUtils.lerp(surface, crownSurfaceZ(x, y), join);
 }
 
 /** The broad CARE-derived character face in the supplied mascot reference. */
@@ -95,7 +99,19 @@ export function buildRoundedPlusShape(p = PLUS_SHAPE): THREE.Shape {
     const by = cur[1] + (d2y / l2) * r;
     if (i === 0) shape.moveTo(ax, ay);
     else shape.lineTo(ax, ay);
-    shape.quadraticCurveTo(cur[0], cur[1], bx, by);
+    if (i <= 2 || i >= 9) {
+      // Lower convex corners and the two concave stem joins use the same
+      // circular fillets as mascotFaceSdf. Keep the accepted crown unchanged.
+      const cx = ax + (d2x / l2) * r;
+      const cy = ay + (d2y / l2) * r;
+      shape.absarc(cx, cy, r,
+        Math.atan2(ay - cy, ax - cx),
+        Math.atan2(by - cy, bx - cx),
+        d1x * d2y - d1y * d2x < 0,
+      );
+    } else {
+      shape.quadraticCurveTo(cur[0], cur[1], bx, by);
+    }
   }
   shape.closePath();
   return shape;
@@ -286,7 +302,18 @@ function buildBodyCSG(): BodyGeometry {
   const pocket = evaluator.evaluate(plusBrush, innerBrush, SUBTRACTION);
   pocket.updateMatrixWorld();
   // body = sphere − pocket.
-  const result = evaluator.evaluate(sphereBrush, pocket, SUBTRACTION);
+  const faceShell = evaluator.evaluate(sphereBrush, pocket, SUBTRACTION);
+  faceShell.updateMatrixWorld();
+  // The side ears sit at the face depth. Matching sockets keep the curved
+  // cream shell from covering their inner edges.
+  const earCutout = new THREE.ExtrudeGeometry(
+    [buildSideEarCutoutShape(-1), buildSideEarCutoutShape(1)],
+    { depth: 1, bevelEnabled: false, curveSegments: 8 },
+  );
+  earCutout.translate(0, 0, 0.30);
+  const earBrush = new Brush(earCutout, bodyMat);
+  earBrush.updateMatrixWorld();
+  const result = evaluator.evaluate(faceShell, earBrush, SUBTRACTION);
 
   const materials = (
     Array.isArray(result.material) ? result.material : [result.material]
@@ -350,6 +377,8 @@ function buildBodyCSG(): BodyGeometry {
   innerBrush.geometry.dispose();
   sphereBrush.geometry.dispose();
   pocket.geometry.dispose();
+  faceShell.geometry.dispose();
+  earCutout.dispose();
   bodyMat.dispose();
   plateMat.dispose();
   return { geometry, slots, csg: true };
@@ -423,125 +452,53 @@ export function getRoundedBoxGeometry(
   );
 }
 
-/**
- * The reference stretches CARE's upper pixels into gently articulated tabs.
- * All four use the same sculpting method and soft surface treatment.
- */
-export const EAR_TILE = {
-  w: 0.40,
-  h: 0.49,
-  d: 0.22,
-  // Preserve the pixel footprint while giving it the edge softness of clay.
-  r: 0.075,
-} as const;
-/** Side pixels are geometrically identical to the crown pixels. */
-export const SIDE_TILE = { w: 0.40, h: 0.44, d: 0.20, r: 0.065 } as const;
-
-/**
- * Inflate the centre of the pixel's front face. The x/y footprint stays on
- * the CARE grid, while the changing normals give the block a soft cushion
- * highlight even in a front-facing view. Shared by all four logo pieces.
- */
-function buildPixelCushion(tile: { w: number; h: number; d: number; r: number }): THREE.BufferGeometry {
-  // Subdivide the ENTIRE face before sculpting. A rounded box has just two
-  // triangles across each flat face, so inflating its centre still leaves a
-  // rigid slab. A welded surface grid gives these cushions their broad dome.
-  const grid = new THREE.BoxGeometry(tile.w, tile.h, tile.d, 28, 36, 16);
-  const positions = grid.getAttribute("position");
-  const half = new THREE.Vector3(tile.w / 2, tile.h / 2, tile.d / 2);
-  const core = half.clone().addScalar(-tile.r);
-  const minCore = core.clone().negate();
-  const point = new THREE.Vector3();
-  const clamped = new THREE.Vector3();
-  const normal = new THREE.Vector3();
-  for (let i = 0; i < positions.count; i++) {
-    point.fromBufferAttribute(positions, i);
-    clamped.copy(point).clamp(minCore, core);
-    normal.copy(point).sub(clamped).normalize();
-    point.copy(clamped).addScaledVector(normal, tile.r);
-    const dx = Math.max(0, 1 - (point.x / half.x) ** 2);
-    const dy = Math.max(0, 1 - (point.y / half.y) ** 2);
-    const front = smooth01(0, tile.d * 0.35, point.z);
-    point.z += 0.035 * dx * dy * front;
-    // Subtle outward bow along the long edges makes the tabs feel stuffed.
-    point.x *= 1 + 0.024 * dy;
-    positions.setXYZ(i, point.x, point.y, point.z);
-  }
-  grid.deleteAttribute("normal");
-  grid.deleteAttribute("uv");
-  const geometry = mergeVertices(grid, 0.00001);
-  grid.dispose();
-  geometry.computeVertexNormals();
-  const uv = new Float32Array(geometry.getAttribute("position").count * 2);
-  const pos = geometry.getAttribute("position");
-  for (let i = 0; i < pos.count; i++) {
-    uv[2 * i] = pos.getX(i) / tile.w + 0.5;
-    uv[2 * i + 1] = pos.getY(i) / tile.h + 0.5;
-  }
-  geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  return bakeVerticalColorGradient(
-    geometry, -tile.h / 2, tile.h / 2,
-    TILE_SHADE.bottom, TILE_SHADE.top,
-  );
+/** Shared horn geometry; each model provides its own two-bone skeleton. */
+export function getEarTileGeometry(side: -1 | 1): THREE.BufferGeometry {
+  return cached(`crownHorn:${side}`, () => buildCrownHornGeometry(side, bodyZ));
 }
 
-/**
- * A crown tab has a curved lower lip and a broad back rooted in the head.
- * Its front keeps the reference's padded shape; the rear volume follows the
- * shell instead of leaving a narrow connector visible in profile.
- */
-export function getEarTileGeometry(restFrame?: THREE.Matrix4): THREE.BufferGeometry {
-  if (!restFrame) return cached("earCushion", () => buildPixelCushion(EAR_TILE));
-  const key = `earCushion:crown:${restFrame.elements.join(":")}`;
-  return cached(key, () => {
-    const geometry = buildPixelCushion(EAR_TILE);
-    const positions = geometry.getAttribute("position");
-    const colors = geometry.getAttribute("color");
-    const faceColor = new THREE.Color(PALETTE.plate);
-    const tileColor = new THREE.Color(PALETTE.tile);
-    const seamColor = [faceColor.r / tileColor.r * 0.97, faceColor.g / tileColor.g, faceColor.b / tileColor.b * 0.93];
-    const inverse = restFrame.clone().invert();
-    const point = new THREE.Vector3();
-    const world = new THREE.Vector3();
-    for (let i = 0; i < positions.count; i++) {
-      point.fromBufferAttribute(positions, i);
-      const height = point.y + EAR_TILE.h / 2;
-      const seam = (1 - smooth01(0, 0.055, height)) * smooth01(-0.10, 0, point.z);
-      colors.setXYZ(i,
-        THREE.MathUtils.lerp(colors.getX(i), seamColor[0], seam),
-        THREE.MathUtils.lerp(colors.getY(i), seamColor[1], seam),
-        THREE.MathUtils.lerp(colors.getZ(i), seamColor[2], seam),
-      );
-      const across = Math.min(1, Math.abs(point.x) / (EAR_TILE.w / 2));
-      const front = smooth01(-0.02, 0.06, point.z);
-      const lip = (1 - smooth01(0, 0.16, height)) * front;
-      const arch = 0.06 - 0.08 * smooth01(0.5, 1, across);
-      point.y += arch * lip;
-      // Roll only the lower edge back into the insert, like the mint hood
-      // around each green face lobe in the reference.
-      point.z -= 0.035 * (1 - smooth01(0, 0.08, height)) * front;
-      world.copy(point).applyMatrix4(restFrame);
-      const back = 1 - smooth01(-0.065, 0.045, point.z);
-      const root = 1 - smooth01(0.21, 0.43, height);
-      // Round the rear haunch down into the crown so the profile has a
-      // padded socket rather than a high triangular web above the shell.
-      world.y -= 0.11 * back * root * smooth01(0.06, 0.2, height);
-      const tuckedBack = Math.min(world.z, Math.max(0.22, bodyZ(world.x, world.y) - 0.07));
-      world.z = THREE.MathUtils.lerp(world.z, tuckedBack, back * root);
-      point.copy(world).applyMatrix4(inverse);
-      positions.setXYZ(i, point.x, point.y, point.z);
-    }
-    geometry.computeVertexNormals();
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
+/** A fine inset line defines the shared horn/forehead border. */
+export function getCrownBorderGeometry(side: -1 | 1): THREE.BufferGeometry {
+  return cached(`crownBorder:${side}`, () => {
+    const curve = new class extends THREE.Curve<THREE.Vector3> {
+      constructor() { super(); }
+      getPoint(t: number, target = new THREE.Vector3()): THREE.Vector3 {
+        const localX = CROWN.halfWidth * Math.sin(Math.PI * (t - 0.5));
+        const x = side * CROWN.centerX + localX;
+        const y = crownBaseY(localX) - 0.002;
+        return target.set(x, y, crownSurfaceZ(x, y) + 0.001);
+      }
+    }();
+    const geometry = new THREE.TubeGeometry(curve, 80, 0.0028, 6, false);
+    const colors = new Float32Array(geometry.getAttribute("position").count * 3).fill(1);
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     return geometry;
   });
 }
 
-export function getSideTileGeometry(): THREE.BufferGeometry {
-  return cached("sideCushion", () => buildPixelCushion(SIDE_TILE));
+export function getSideTileGeometry(side: -1 | 1): THREE.BufferGeometry {
+  return cached(`sideEar:${side}`, () => buildSideEarGeometry(side, plateZ, bodyZ));
+}
+
+export function getSideBorderGeometry(side: -1 | 1): THREE.BufferGeometry {
+  return cached(`sideEarBorder:${side}`, () => {
+    const curve = new class extends THREE.Curve<THREE.Vector3> {
+      constructor() { super(); }
+      getPoint(t: number, target = new THREE.Vector3()): THREE.Vector3 {
+        const x = side * (SIDE_EAR.innerX - 0.001);
+        const y = THREE.MathUtils.lerp(
+          SIDE_EAR.minY + SIDE_EAR.innerRadius,
+          SIDE_EAR.maxY - SIDE_EAR.innerRadius,
+          t,
+        );
+        return target.set(x, y, plateZ(x, y) + 0.001);
+      }
+    }();
+    const geometry = new THREE.TubeGeometry(curve, 48, 0.0028, 6, false);
+    const colors = new Float32Array(geometry.getAttribute("position").count * 3).fill(1);
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    return geometry;
+  });
 }
 
 /**
@@ -594,27 +551,68 @@ export function getFootGeometry(): THREE.SphereGeometry {
   );
 }
 
-/** Closed-eye arc: compact, deep curve matching the illustrated blink. */
-export function getEyeArcGeometry(): THREE.TubeGeometry {
-  return cached("eyeArc", () => {
-    const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(-0.118, 0, 0),
-      new THREE.Vector3(0, 0.18, 0),
-      new THREE.Vector3(0.118, 0, 0),
-    );
-    return new THREE.TubeGeometry(curve, 24, 0.015, 10, false);
+/** Flat discs keep cartoon eyes free of lens depth and shaded rims. */
+export function getEyePatchGeometry(): THREE.CircleGeometry {
+  return cached("eyePatch", () => new THREE.CircleGeometry(1, 64));
+}
+
+/** Gently curved ink beans, mirrored so both eyes lean toward the smile. */
+export function getCartoonEyeGeometry(side: -1 | 1): THREE.CircleGeometry {
+  return cached(`cartoonEye:${side}`, () => {
+    const geometry = getEyePatchGeometry().clone();
+    const positions = geometry.getAttribute("position");
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      positions.setX(i, x * (1 - 0.10 * y) + side * 0.12 * (1 - y * y));
+    }
+    geometry.computeBoundingSphere();
+    return geometry;
   });
 }
 
-/** Eyebrow: a short, thin "︵" arc (apex ≈ 0.025 above its ends). */
-export function getBrowGeometry(): THREE.TubeGeometry {
-  return cached("brow", () => {
-    const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(-0.044, 0, 0),
-      new THREE.Vector3(0, 0.038, 0),
-      new THREE.Vector3(0.044, 0, 0),
+/** A flat, round-ended brush stroke for blinks and smiling eyes. */
+export function getEyeArcGeometry(): THREE.ShapeGeometry {
+  return cached("eyeArc", () => {
+    const curve = new THREE.QuadraticBezierCurve(
+      new THREE.Vector2(-0.11, 0),
+      new THREE.Vector2(0, 0.15),
+      new THREE.Vector2(0.11, 0),
     );
-    return new THREE.TubeGeometry(curve, 16, 0.009, 8, false);
+    const radius = 0.014;
+    const shape = new THREE.Shape();
+    for (let i = 0; i <= 32; i++) {
+      const point = curve.getPoint(i / 32);
+      const tangent = curve.getTangent(i / 32);
+      const x = point.x - tangent.y * radius;
+      const y = point.y + tangent.x * radius;
+      if (i === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    }
+    const end = curve.getPoint(1);
+    const endAngle = curve.getTangent(1).angle();
+    shape.absarc(end.x, end.y, radius,
+      endAngle + Math.PI / 2, endAngle - Math.PI / 2, true);
+    for (let i = 32; i >= 0; i--) {
+      const point = curve.getPoint(i / 32);
+      const tangent = curve.getTangent(i / 32);
+      shape.lineTo(point.x + tangent.y * radius, point.y - tangent.x * radius);
+    }
+    const start = curve.getPoint(0);
+    const startAngle = curve.getTangent(0).angle();
+    shape.absarc(start.x, start.y, radius,
+      startAngle - Math.PI / 2, startAngle + Math.PI / 2, true);
+    shape.closePath();
+    return new THREE.ShapeGeometry(shape, 8);
+  });
+}
+
+/** Short, round-ended painted eyebrows share the blink stroke's softness. */
+export function getBrowGeometry(): THREE.ShapeGeometry {
+  return cached("brow", () => {
+    const geometry = getEyeArcGeometry().clone();
+    geometry.scale(0.4, 0.36, 1);
+    return geometry;
   });
 }
 

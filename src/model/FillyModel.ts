@@ -60,7 +60,7 @@ export interface FillyModelOptions {
   materials?: Partial<FillyMaterials>;
   /** Include the contact shadow plane (default true). */
   shadow?: boolean;
-  /** Paint emerald irises as in the reference (default true; false gives solid dark eyes). */
+  /** Opt into painted irises on the built-in eye material (default false). */
   irisTexture?: boolean;
 }
 
@@ -181,9 +181,10 @@ export class FillyModel extends THREE.Group {
       footR,
     );
 
-    // Face. Solid glossy eyes like the hero image; `irisTexture: true` paints a
-    // green iris onto the shared eye material instead (null without a DOM).
-    this.eyeTexture = opts.irisTexture !== false ? ensureEyeTexture(mats) : null;
+    // Cartoon ink eyes by default. The optional iris only touches materials
+    // owned by this model; caller-supplied maps retain their own lifecycle.
+    this.eyeTexture = opts.irisTexture === true && this.ownsMaterials.has(mats.eye)
+      ? ensureEyeTexture(mats) : null;
     this.eyeL = buildEye(-1, mats);
     this.eyeR = buildEye(1, mats);
     const cheekL = buildCheek(-1, mats);
@@ -338,6 +339,8 @@ export class FillyModel extends THREE.Group {
     this.decorations.dispose();
     this.eyeL.arcMaterial.dispose();
     this.eyeR.arcMaterial.dispose();
+    this.earL.tile.skeleton.dispose();
+    this.earR.tile.skeleton.dispose();
     if (this.eyeTexture) {
       // Only detach from materials we own; overrides keep whatever they had.
       if (this.ownsMaterials.has(this.materials.eye))
