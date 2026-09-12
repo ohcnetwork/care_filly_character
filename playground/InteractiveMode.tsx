@@ -66,6 +66,7 @@ export function InteractiveMode() {
             followPointer={followPointer && !orbitControls}
             interactive={!orbitControls}
             orbitControls={orbitControls}
+            backflipOnClick
           />
         </div>
         <div className="stage-caption" aria-live="polite">

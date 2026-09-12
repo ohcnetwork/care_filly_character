@@ -43,6 +43,8 @@ export interface FillyCharacterProps {
   interactive?: boolean;
   /** Drag to inspect in 3D (default false); temporarily disables pointer reactions. */
   orbitControls?: boolean;
+  /** Trigger a backflip when Filly is clicked (default false). */
+  backflipOnClick?: boolean;
   /** Fired on click when `interactive`. */
   onClick?: () => void;
   className?: string;
@@ -91,6 +93,7 @@ export const FillyCharacter = forwardRef<
     followPointer = true,
     interactive = true,
     orbitControls = false,
+    backflipOnClick = false,
     onClick,
     className,
     style,
@@ -106,6 +109,7 @@ export const FillyCharacter = forwardRef<
 ) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [backflipTrigger, setBackflipTrigger] = useState(0);
 
   // One animator per seed. It starts in the state current at creation time (so
   // a runtime `seed` change doesn't replay an enter impulse from the mount
@@ -151,6 +155,14 @@ export const FillyCharacter = forwardRef<
     followPointer && !frozen && !orbitControls,
   );
   const onScreen = useOnScreen(wrapperRef);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const running = !paused && onScreen && !frozen;
   // While paused/offscreen/frozen the Canvas runs in "demand" mode (not
   // "never"): r3f ignores invalidate() in "never" mode, so a character paused
@@ -187,6 +199,7 @@ export const FillyCharacter = forwardRef<
   const handleUp = useCallback(() => hint("hover"), [hint]);
   const handleClick = useCallback(() => {
     if (!interactive || frozen || orbitControls) return;
+    if (backflipOnClick) setBackflipTrigger((value) => value + 1);
     animator.setState("happy");
     if (happyTimer.current !== null) clearTimeout(happyTimer.current);
     happyTimer.current = setTimeout(() => {
@@ -194,7 +207,7 @@ export const FillyCharacter = forwardRef<
       animator.setState(propStateRef.current);
     }, CLICK_HAPPY_SECONDS * 1000);
     onClick?.();
-  }, [animator, interactive, frozen, orbitControls, onClick]);
+  }, [animator, backflipOnClick, interactive, frozen, orbitControls, onClick]);
 
   useEffect(() => {
     if (!interactive || orbitControls) animator.setInteractionHint("none");
@@ -266,6 +279,8 @@ export const FillyCharacter = forwardRef<
         <FillyScene
           animator={animator}
           running={running}
+          backflipTrigger={backflipTrigger}
+          reducedMotion={reducedMotion}
           freeze={freeze}
           onReady={handleReady}
         />

@@ -35,6 +35,10 @@ export interface FillyScenePropsInternal {
   animator: FillyAnimator;
   /** When false the animator is not advanced (the last pose stays on screen). */
   running: boolean;
+  /** Increment to trigger a one-shot backflip. */
+  backflipTrigger?: number;
+  /** Disable ambient activity when the user prefers reduced motion. */
+  reducedMotion?: boolean;
   /** Static deterministic frame; when set `running` is ignored. */
   freeze?: FillyFreeze;
   /** Called once the first frame with the character has been rendered. */
@@ -87,6 +91,8 @@ function useCameraAndRenderer(): void {
 export function FillyScene({
   animator,
   running,
+  backflipTrigger = 0,
+  reducedMotion = false,
   freeze,
   onReady,
 }: FillyScenePropsInternal) {
@@ -94,8 +100,16 @@ export function FillyScene({
   const invalidate = useThree((s) => s.invalidate);
   const modelRef = useRef<FillyModel | null>(null);
   const readyRef = useRef(false);
+  const backflipElapsedRef = useRef(Number.POSITIVE_INFINITY);
+  const backflipTriggerRef = useRef(backflipTrigger);
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+
+  useEffect(() => {
+    if (backflipTriggerRef.current === backflipTrigger) return;
+    backflipTriggerRef.current = backflipTrigger;
+    backflipElapsedRef.current = 0;
+  }, [backflipTrigger]);
 
   useRoomEnvironment();
   useCameraAndRenderer();
@@ -134,6 +148,16 @@ export function FillyScene({
     if (!model) return;
     if (!frozen && running) animator.update(dt);
     model.applyPose(animator.pose, animator.time);
+    if (!reducedMotion && !frozen && backflipElapsedRef.current < 0.72) {
+      backflipElapsedRef.current += dt;
+      const progress = Math.min(1, backflipElapsedRef.current / 0.72);
+      const eased = progress * progress * (3 - 2 * progress);
+      model.position.y = Math.sin(Math.PI * eased) * 0.72;
+      model.rotation.x = eased * Math.PI * 2;
+    } else {
+      model.position.y = 0;
+      model.rotation.x = 0;
+    }
     if (!readyRef.current) {
       readyRef.current = true;
       // The frame is rendered synchronously after this callback; notify on the next tick.
