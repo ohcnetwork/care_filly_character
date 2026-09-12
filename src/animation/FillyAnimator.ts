@@ -44,11 +44,11 @@ export interface FillyAnimatorOptions {
 }
 
 /** Pointer-follow gains (see spec §4.4). */
-const POINTER_EYE_GAIN = 0.35;
+const POINTER_EYE_GAIN = 0.55;
 const POINTER_YAW_GAIN = 0.12;
 const POINTER_PITCH_GAIN = 0.08;
 /** Extra gaze gain while hovered. */
-const HOVER_EYE_BOOST = 1.4;
+const HOVER_EYE_BOOST = 1.25;
 
 /** Overlay weights below this are skipped entirely. */
 const WEIGHT_EPSILON = 1e-3;
