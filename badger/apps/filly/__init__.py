@@ -4,9 +4,8 @@ import os
 sys.path.insert(0, "/system/apps/filly")
 os.chdir("/system/apps/filly")
 
-import gc
 import json
-from badgeware import io, screen, run, brushes, shapes, SpriteSheet, PixelFont
+from badgeware import io, screen, run, brushes, shapes, Image, PixelFont
 
 # Filly, the CARE mascot, as a badge pet (GitHub Universe 2025 badge, badgeware API).
 #
@@ -18,9 +17,13 @@ from badgeware import io, screen, run, brushes, shapes, SpriteSheet, PixelFont
 # A press of A, B, C or UP while Filly sleeps wakes Filly with a surprise.
 # A reaction returns to idle after REACTION_SECONDS.
 #
-# The sprite sheets and manifest.json come from `npm run export:badger` in
+# The frames and manifest.json come from `npm run export:badger` in
 # https://github.com/ohcnetwork/care_filly_character. The manifest lists the
 # frame count, frame rate and loop point of each state.
+#
+# The badge heap is ~240 kB and fragmented, so no sprite sheet stays in RAM.
+# Each frame is a small PNG (assets/<state>/NN.png) decoded when it is shown,
+# like the MonaOS startup animation.
 
 REACTION_SECONDS = 3
 FLOOR_Y = 94
@@ -31,7 +34,7 @@ with open("assets/manifest.json") as f:
 
 CELL = manifest["cell"]
 BASELINE = manifest["baseline"]
-SHEETS = manifest["sheets"]
+STATES = manifest["states"]
 del manifest
 
 screen.font = PixelFont.load("/system/assets/fonts/ark.ppf")
@@ -64,30 +67,34 @@ REACTIONS = {
 }
 
 
-class Sheet:
-    """The frames of one state. The PNG is decoded when the state starts."""
+class Clip:
+    """The frames of one state. Only the frame on screen is in RAM."""
 
     def __init__(self, name):
-        info = SHEETS[name]
+        info = STATES[name]
+        self.dir = info["dir"]
         self.fps = info["fps"]
         self.frames = info["frames"]
-        self.cols = info["cols"]
         self.loop_start = info["loop_start"]
-        self.sprites = SpriteSheet("assets/" + info["file"], info["cols"], info["rows"])
+        self.index = -1
+        self.image = None
 
     def frame(self, seconds):
         # play the lead-in once, then loop the tail
         i = int(seconds * self.fps)
         if i >= self.frames:
             i = self.loop_start + (i - self.loop_start) % (self.frames - self.loop_start)
-        return self.sprites.sprite(i % self.cols, i // self.cols)
+        if i != self.index:
+            self.image = None  # free the old frame before the next decode
+            self.image = Image.load("assets/{}/{:02d}.png".format(self.dir, i))
+            self.index = i
+        return self.image
 
 
 class Filly:
     def __init__(self):
-        self.idle = Sheet("idle")  # always resident
-        self.sheet = self.idle
         self.state = "idle"
+        self.clip = Clip("idle")
         self.since = io.ticks
 
     def elapsed(self):
@@ -96,14 +103,9 @@ class Filly:
     def set_state(self, name):
         if name == self.state:
             return
-        # free the previous reaction sheet before the next one is decoded
-        if self.sheet is not self.idle:
-            self.sheet = self.idle
-            gc.collect()
         self.state = name
+        self.clip = Clip(name)
         self.since = io.ticks
-        if name != "idle":
-            self.sheet = Sheet(name)
 
     def react(self, name):
         if self.state == "sleepy":
@@ -117,7 +119,7 @@ class Filly:
     def draw(self):
         screen.brush = SHADOW
         screen.draw(shapes.rounded_rectangle(CENTER_X - 17, FLOOR_Y - 2, 34, 5, 2))
-        image = self.sheet.frame(self.elapsed())
+        image = self.clip.frame(self.elapsed())
         screen.blit(image, CENTER_X - CELL // 2, FLOOR_Y - BASELINE)
 
 

@@ -1,10 +1,18 @@
 /**
- * Filly sprite sheets for the GitHub Universe 2025 badge (Badger / Tufty 2350,
- * MicroPython `badgeware`): one paletted PNG per state plus `manifest.json`.
+ * Filly sprite frames for the GitHub Universe 2025 badge (Badger / Tufty 2350,
+ * MicroPython `badgeware`): one paletted PNG per animation frame, grouped in a
+ * directory per state, plus `manifest.json`.
  *
- *   npm run export:badger [-- --out badger/apps/filly/assets] [--port 5179] [--cell 56] [--cols 8]
+ *   npm run export:badger [-- --out badger/apps/filly/assets] [--port 5179] [--cell 56]
  *
- * Also writes the app's 24×24 `icon.png` next to the assets directory. Frames come from the playground's deterministic frame page (`?state=&t=&from=`),
+ * Also writes the app's 24×24 `icon.png` next to the assets directory.
+ *
+ * Why single frames: the badge's MicroPython heap is ~240 kB and fragmented
+ * (largest free block ≈ 48 kB), so a per-state sprite sheet cannot be decoded.
+ * The app decodes the current frame from flash instead (≈ 4 ms, ≈ 4.5 kB),
+ * like MonaOS's own startup animation.
+ *
+ * Frames come from the playground's deterministic frame page (`?state=&t=&from=`),
  * driven through `window.__fillyFrame` so the page loads once. Every frame is
  * cropped to one shared square (so the feet stay put across states), box-filtered
  * down to `cell` px and quantised (median cut) to at most 255 opaque colours plus
@@ -51,11 +59,7 @@ interface SheetPlan {
   audio?: number;
 }
 
-/**
- * Loop lengths follow the overlay periods in src/animation/modulators.ts.
- * Frame budgets keep every sheet ≤ ~100 kB decoded (56 px cells ≈ 3.1 kB each):
- * the badge holds idle plus one reaction sheet in RAM.
- */
+/** Loop lengths follow the overlay periods in src/animation/modulators.ts. */
 const PLANS: readonly SheetPlan[] = [
   { state: "idle", fps: 8, loop: 4, lead: [1, 2] }, // breathing 0.25 Hz; before the first idle glance
   { state: "listening", fps: 10, from: "idle", loop: 1, lead: [1, 1.5] }, // ear wiggle 3 Hz
@@ -73,12 +77,12 @@ interface SheetTiming {
   loopStart: number;
 }
 
-interface ManifestSheet {
-  file: string;
+interface ManifestClip {
+  /** Directory under assets/ holding `00.png` … `NN.png`. */
+  dir: string;
   frames: number;
-  cols: number;
-  rows: number;
   fps: number;
+  /** Frames before this index play once; from it the clip loops. */
   loop_start: number;
 }
 
@@ -86,7 +90,7 @@ interface Manifest {
   cell: number;
   /** Feet baseline: y offset of the character's lowest opaque pixel inside a cell. */
   baseline: number;
-  sheets: Record<FillyState, ManifestSheet>;
+  states: Record<FillyState, ManifestClip>;
 }
 
 /** Mirror of the playground's `window.__fillyFrame` (playground/FrameMode.tsx); evaluate callbacks run in the browser. */
@@ -214,7 +218,7 @@ function squareBox(box: Box, pad: number, width: number, height: number): Box {
  * Area-averaging resample of `box` in `src` to a `cell`×`cell` RGBA image.
  * Colours are averaged premultiplied, so edge pixels keep the character's
  * colour rather than bleeding towards transparent black. With `binaryAlpha`
- * (sprite sheets) coverage ≥ ALPHA_THRESHOLD is opaque and the rest is clear.
+ * (sprite frames) coverage ≥ ALPHA_THRESHOLD is opaque and the rest is clear.
  */
 function resampleCell(src: Rgba, box: Box, cell: number, binaryAlpha = true): Rgba {
   const out = new Uint8Array(cell * cell * 4);
@@ -252,22 +256,6 @@ function resampleCell(src: Rgba, box: Box, cell: number, binaryAlpha = true): Rg
     }
   }
   return { width: cell, height: cell, data: out };
-}
-
-/** Lay `cells` out on a `cols`-wide grid (row-major), transparent elsewhere. */
-function composeGrid(cells: Rgba[], cell: number, cols: number): Rgba {
-  const rows = Math.ceil(cells.length / cols);
-  const width = cols * cell;
-  const height = rows * cell;
-  const data = new Uint8Array(width * height * 4);
-  cells.forEach((c, i) => {
-    const ox = (i % cols) * cell;
-    const oy = Math.floor(i / cols) * cell;
-    for (let y = 0; y < cell; y++) {
-      data.set(c.data.subarray(y * cell * 4, (y + 1) * cell * 4), ((oy + y) * width + ox) * 4);
-    }
-  });
-  return { width, height, data };
 }
 
 // ── PNG8 + tRNS ───────────────────────────────────────────────────────────────
@@ -392,7 +380,6 @@ async function main(): Promise<void> {
   const outDir = path.resolve(ROOT, args.out ?? "badger/apps/filly/assets");
   const port = Number(args.port ?? 5179);
   const cell = Number(args.cell ?? 56);
-  const cols = Number(args.cols ?? 8);
   await fs.mkdir(outDir, { recursive: true });
 
   const timings = new Map<FillyState, SheetTiming>();
@@ -441,36 +428,36 @@ async function main(): Promise<void> {
     await pg.close();
   }
 
-  // One crop for every state, so the feet line up when the badge swaps sheets.
+  // One crop for every state, so the feet line up when the badge swaps clips.
   let bounds: Box | null = null;
   for (const frames of captured.values()) for (const f of frames) bounds = unionBox(bounds, alphaBounds(f, ALPHA_THRESHOLD));
   if (!bounds) throw new Error("no opaque pixels captured");
   const crop = squareBox(bounds, CROP_PADDING, CAPTURE_SIZE, CAPTURE_SIZE);
   console.log(`crop ${crop.x1 - crop.x0}px square at (${crop.x0}, ${crop.y0}) → ${cell}px cells`);
 
-  const manifest: Manifest = { cell, baseline: 0, sheets: {} as Manifest["sheets"] };
+  const manifest: Manifest = { cell, baseline: 0, states: {} as Manifest["states"] };
   let lowest = 0;
   for (const plan of PLANS) {
+    const dir = path.join(outDir, plan.state);
+    await fs.rm(dir, { recursive: true, force: true });
+    await fs.mkdir(dir, { recursive: true });
     const cells = captured.get(plan.state)!.map((f) => resampleCell(f, crop, cell));
-    for (const c of cells) {
-      const b = alphaBounds(c, 255);
+    let bytes = 0;
+    for (let i = 0; i < cells.length; i++) {
+      const b = alphaBounds(cells[i], 255);
       if (b && b.y1 > lowest) lowest = b.y1;
+      const png = encodePng8(cells[i]);
+      bytes += png.length;
+      await fs.writeFile(path.join(dir, `${String(i).padStart(2, "0")}.png`), png);
     }
-    const sheetCols = Math.min(cols, cells.length);
-    const sheet = composeGrid(cells, cell, sheetCols);
-    const file = `filly-${plan.state}.png`;
-    const png = encodePng8(sheet);
-    await fs.writeFile(path.join(outDir, file), png);
     const timing = timings.get(plan.state)!;
-    manifest.sheets[plan.state] = {
-      file,
+    manifest.states[plan.state] = {
+      dir: plan.state,
       frames: cells.length,
-      cols: sheetCols,
-      rows: Math.ceil(cells.length / sheetCols),
       fps: plan.fps,
       loop_start: timing.loopStart,
     };
-    console.log(`${file}: ${sheet.width}×${sheet.height}, ${cells.length} frames, ${(png.length / 1024).toFixed(1)} kB`);
+    console.log(`${plan.state}/: ${cells.length} frames, ${(bytes / 1024).toFixed(1)} kB`);
   }
   manifest.baseline = lowest;
   await fs.writeFile(path.join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");

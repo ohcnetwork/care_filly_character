@@ -152,17 +152,21 @@ Animation lives in code, not in the file. Regenerate with `npm run export:glb`.
 
 Filly also runs as a pet app on the GitHub Universe 2025 badge (Pimoroni Tufty 2350 with MonaOS,
 [gh.io/badger](https://gh.io/badger)). The badge cannot run three.js, so `npm run export:badger`
-renders sprite sheets from the playground: one 8-bit paletted PNG per state (56×56 cells,
-transparent index 0, the format of the badge's own Mona sheets) plus `manifest.json` with the
-frame count, frame rate and loop point of each state. Reaction sheets start with the ease-in
-from idle (`freezeFrom`), then a seamless loop.
+renders the animation from the playground as sprite frames: one 8-bit paletted 56×56 PNG per
+frame (transparent index 0, the format of the badge's own Mona sprites), grouped in a directory
+per state, plus `manifest.json` with the frame count, frame rate and loop point of each state.
+Reaction clips start with the ease-in from idle (`freezeFrom`), then a seamless loop.
 
 ```
 badger/apps/filly/
 ├── __init__.py      MonaOS app (2025 badgeware API): A listen · B talk · C happy · UP think · DOWN sleep
 ├── icon.png         24×24 menu icon (generated)
-└── assets/          filly-<state>.png sheets + manifest.json (generated)
+└── assets/          manifest.json + <state>/NN.png frames (generated)
 ```
+
+The MicroPython heap on the badge is about 240 kB and fragmented (largest free block about
+48 kB), so the app keeps no sprite sheet in RAM. It decodes the frame on screen from flash
+(about 4 ms and 4.5 kB per frame), like the MonaOS startup animation.
 
 Install on the badge:
 
@@ -173,8 +177,9 @@ Install on the badge:
    `("filly", "filly")`.
 4. Eject the disk. Press RESET 1 time.
 
-The app keeps the idle sheet in RAM and decodes one reaction sheet at a time (≤ 100 kB each).
-Test without hardware with the [badge25 simulator](https://github.com/badger/home/tree/main/badge25/simulator):
+To see an app error, read the badge's USB serial port (`cat /dev/cu.usbmodem*`): MicroPython
+prints the traceback there before the watchdog restarts the badge. Test without hardware with
+the [badge25 simulator](https://github.com/badger/home/tree/main/badge25/simulator):
 `python badge_simulator.py -C <root> <root>/apps/filly`, where `<root>` holds `apps/filly` and the
 badge's `assets/` fonts.
 
@@ -190,8 +195,8 @@ src/
 └── react/       <FillyCharacter> (Canvas, lights, env, frame loop), <FillyMascot>
 playground/      dev page: interactive / ?state=&t=[&from=] frames / ?sheet=1 / ?export=1
 scripts/         harness.mts (vite + headless Chromium), snapshot.mts (screenshots),
-                 export-glb.mts (.glb), export-badger.mts (badge sprite sheets), singlefile.mts (one-file demo page)
-badger/          GitHub Universe 2025 badge app + generated sprite sheets
+                 export-glb.mts (.glb), export-badger.mts (badge sprite frames), singlefile.mts (one-file demo page)
+badger/          GitHub Universe 2025 badge app + generated sprite frames
 docs/superpowers/specs/   design spec
 ```
 
@@ -217,7 +222,7 @@ npm run snapshot     # screenshots/*.png + sheet.png (headless Chromium)
 npm run build        # dist/index.js + d.ts
 npm run build:playground # dist-playground/ — static site for Cloudflare Pages
 npm run export:glb   # dist/filly-mascot.glb
-npm run export:badger # badger/apps/filly/{icon.png,assets/} — sprite sheets for the Universe 2025 badge (~10 min)
+npm run export:badger # badger/apps/filly/{icon.png,assets/} — sprite frames for the Universe 2025 badge (~10 min)
 npm run build:all    # clean + build + export:glb
 npm run build:demo   # dist-playground/filly-playground.html — the playground as ONE self-contained file
 ```
