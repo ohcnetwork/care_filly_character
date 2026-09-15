@@ -3,20 +3,29 @@
  * MicroPython `badgeware`): one paletted PNG per animation frame, grouped in a
  * directory per state, plus `manifest.json`.
  *
- *   npm run export:badger [-- --out badger/apps/filly/assets] [--port 5179] [--cell 56]
+ *   npm run export:badger [-- --out badger/filly/assets] [--apps badger/apps] [--port 5179] [--body 72]
  *
- * Also writes the app's 24×24 `icon.png` next to the assets directory.
+ * Also writes the 24×24 `icon.png` of each badge app (see ICONS).
  *
  * Why single frames: the badge's MicroPython heap is ~240 kB and fragmented
  * (largest free block ≈ 48 kB), so a per-state sprite sheet cannot be decoded.
- * The app decodes the current frame from flash instead (≈ 4 ms, ≈ 4.5 kB),
- * like MonaOS's own startup animation.
+ * The app decodes the current frame from flash instead, like MonaOS's own
+ * startup animation.
  *
  * Frames come from the playground's deterministic frame page (`?state=&t=&from=`),
- * driven through `window.__fillyFrame` so the page loads once. Every frame is
- * cropped to one shared square (so the feet stay put across states), box-filtered
- * down to `cell` px and quantised (median cut) to at most 255 opaque colours plus
- * 1 transparent index — the PNG8 + tRNS layout of the badge's own Mona sheets.
+ * driven through `window.__fillyFrame` so the page loads once.
+ *
+ * Size and anchor: one scale for every state, set so the idle body is `body`
+ * px tall on the badge. Each state gets its own crop box (the smallest box
+ * around all of its frames), so the idle body is not shrunk to make room for
+ * the happy bounce or the sleepy zzz. The manifest stores each box as an
+ * offset (`ox`, `oy`) from a shared anchor: the feet point, the bottom centre
+ * of the idle body. An app blits a frame at (anchor_x + ox, anchor_y + oy) and
+ * the feet stay put when the state changes.
+ *
+ * Every frame is box-filtered down to the badge scale and quantised (median
+ * cut) to at most 255 opaque colours plus 1 transparent index — the PNG8 +
+ * tRNS layout of the badge's own Mona sheets.
  *
  * Loop seams: a FillyAnimator is stepped in Node with the same seed and dt as the
  * page, and the loop window whose first pose and "one past last" pose match best
@@ -32,7 +41,7 @@ import { createPose, POSE_KEYS, type FillyPose, type FillyState } from "../src/c
 import { launchBrowser, parseArgs, ROOT, startPlayground, wirePageLogging } from "./harness.mjs";
 
 const READY_TIMEOUT = 90_000;
-/** Capture size in CSS px (deviceScaleFactor 1); ~8× the default cell for a clean box filter. */
+/** Capture size in CSS px (deviceScaleFactor 1); ~6× the badge scale for a clean box filter. */
 const CAPTURE_SIZE = 448;
 /** Alpha at or above this (after the box filter) is opaque; below is transparent (binary alpha). */
 const ALPHA_THRESHOLD = 128;
@@ -40,8 +49,17 @@ const ALPHA_THRESHOLD = 128;
 const SEAM_TOLERANCE = 0.01;
 /** Menu icon size (px). */
 const ICON_SIZE = 24;
-/** Extra transparent pixels around the shared crop, in capture px. */
-const CROP_PADDING = 6;
+/** Extra transparent pixels around each crop box, in badge px. */
+const CROP_PADDING = 1;
+/** Height of the idle body on the badge (px). The badge screen is 160×120. */
+const DEFAULT_BODY = 72;
+
+/** Menu icon of each badge app: a frame of one state, cropped to that frame. */
+const ICONS: readonly { app: string; state: FillyState; frame: "first" | "loop" }[] = [
+  { app: "filly-mascot", state: "idle", frame: "first" },
+  { app: "filly-pulse", state: "surprised", frame: "loop" },
+  { app: "filly-pet", state: "happy", frame: "loop" },
+];
 
 interface SheetPlan {
   state: FillyState;
@@ -84,12 +102,21 @@ interface ManifestClip {
   fps: number;
   /** Frames before this index play once; from it the clip loops. */
   loop_start: number;
+  /** Frame size (px). */
+  w: number;
+  h: number;
+  /** Top-left of the frame, relative to the anchor (the feet point). Blit at (anchor_x + ox, anchor_y + oy). */
+  ox: number;
+  oy: number;
 }
 
 interface Manifest {
-  cell: number;
-  /** Feet baseline: y offset of the character's lowest opaque pixel inside a cell. */
-  baseline: number;
+  /** Badge px per capture px. */
+  scale: number;
+  /** Size of the idle body (px); its bottom centre is the anchor. */
+  body: { w: number; h: number };
+  /** Farthest any frame reaches from the anchor (px): left and right of it, up from it, down below it. */
+  extent: { left: number; right: number; up: number; down: number };
   states: Record<FillyState, ManifestClip>;
 }
 
@@ -214,38 +241,73 @@ function squareBox(box: Box, pad: number, width: number, height: number): Box {
   return { x0, y0, x1: x0 + size, y1: y0 + size };
 }
 
+/** A frame box on the badge, relative to the anchor. */
+interface Cell {
+  w: number;
+  h: number;
+  ox: number;
+  oy: number;
+}
+
 /**
- * Area-averaging resample of `box` in `src` to a `cell`×`cell` RGBA image.
- * Colours are averaged premultiplied, so edge pixels keep the character's
- * colour rather than bleeding towards transparent black. With `binaryAlpha`
- * (sprite frames) coverage ≥ ALPHA_THRESHOLD is opaque and the rest is clear.
+ * The smallest whole-pixel badge box (plus CROP_PADDING) around a capture-px
+ * `box`, relative to the anchor. Whole badge px from the anchor keep the feet
+ * on the same screen pixel in every state.
  */
-function resampleCell(src: Rgba, box: Box, cell: number, binaryAlpha = true): Rgba {
-  const out = new Uint8Array(cell * cell * 4);
-  const scale = (box.x1 - box.x0) / cell;
+function cellFor(box: Box, anchor: { x: number; y: number }, scale: number): Cell {
+  const ox = Math.floor((box.x0 - anchor.x) * scale) - CROP_PADDING;
+  const oy = Math.floor((box.y0 - anchor.y) * scale) - CROP_PADDING;
+  const w = Math.ceil((box.x1 - anchor.x) * scale) + CROP_PADDING - ox;
+  const h = Math.ceil((box.y1 - anchor.y) * scale) + CROP_PADDING - oy;
+  return { w, h, ox, oy };
+}
+
+/** The capture-px source box of a badge `cell`. It may reach outside the capture. */
+function sourceBox(cell: Cell, anchor: { x: number; y: number }, scale: number): Box {
+  return {
+    x0: anchor.x + cell.ox / scale,
+    y0: anchor.y + cell.oy / scale,
+    x1: anchor.x + (cell.ox + cell.w) / scale,
+    y1: anchor.y + (cell.oy + cell.h) / scale,
+  };
+}
+
+/**
+ * Area-averaging resample of `box` in `src` (capture px, may be fractional or
+ * reach outside the image; outside pixels are transparent) to a `w`×`h` RGBA
+ * image. Colours are averaged premultiplied, so edge pixels keep the
+ * character's colour rather than bleeding towards transparent black. With
+ * `binaryAlpha` (sprite frames) coverage ≥ ALPHA_THRESHOLD is opaque and the
+ * rest is clear.
+ */
+function resample(src: Rgba, box: Box, w: number, h: number, binaryAlpha = true): Rgba {
+  const out = new Uint8Array(w * h * 4);
+  const scaleX = (box.x1 - box.x0) / w;
+  const scaleY = (box.y1 - box.y0) / h;
   const sums = new Float64Array(4);
-  for (let cy = 0; cy < cell; cy++) {
-    const sy0 = box.y0 + cy * scale;
-    const sy1 = sy0 + scale;
-    for (let cx = 0; cx < cell; cx++) {
-      const sx0 = box.x0 + cx * scale;
-      const sx1 = sx0 + scale;
+  for (let cy = 0; cy < h; cy++) {
+    const sy0 = box.y0 + cy * scaleY;
+    const sy1 = sy0 + scaleY;
+    for (let cx = 0; cx < w; cx++) {
+      const sx0 = box.x0 + cx * scaleX;
+      const sx1 = sx0 + scaleX;
       sums.fill(0);
       let area = 0;
       for (let sy = Math.floor(sy0); sy < Math.ceil(sy1); sy++) {
         const wy = Math.min(sy + 1, sy1) - Math.max(sy, sy0);
         for (let sx = Math.floor(sx0); sx < Math.ceil(sx1); sx++) {
-          const w = wy * (Math.min(sx + 1, sx1) - Math.max(sx, sx0));
+          const weight = wy * (Math.min(sx + 1, sx1) - Math.max(sx, sx0));
+          area += weight;
+          if (sx < 0 || sy < 0 || sx >= src.width || sy >= src.height) continue;
           const i = (sy * src.width + sx) * 4;
           const a = src.data[i + 3] / 255;
-          sums[0] += src.data[i] * a * w;
-          sums[1] += src.data[i + 1] * a * w;
-          sums[2] += src.data[i + 2] * a * w;
-          sums[3] += a * w;
-          area += w;
+          sums[0] += src.data[i] * a * weight;
+          sums[1] += src.data[i + 1] * a * weight;
+          sums[2] += src.data[i + 2] * a * weight;
+          sums[3] += a * weight;
         }
       }
-      const o = (cy * cell + cx) * 4;
+      const o = (cy * w + cx) * 4;
       const alpha = (sums[3] / area) * 255;
       if (sums[3] > 0 && (binaryAlpha ? alpha >= ALPHA_THRESHOLD : alpha >= 1)) {
         out[o] = Math.round(sums[0] / sums[3]);
@@ -255,7 +317,7 @@ function resampleCell(src: Rgba, box: Box, cell: number, binaryAlpha = true): Rg
       }
     }
   }
-  return { width: cell, height: cell, data: out };
+  return { width: w, height: h, data: out };
 }
 
 // ── PNG8 + tRNS ───────────────────────────────────────────────────────────────
@@ -377,9 +439,10 @@ function encodePng8(image: Rgba): Buffer {
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
-  const outDir = path.resolve(ROOT, args.out ?? "badger/apps/filly/assets");
+  const outDir = path.resolve(ROOT, args.out ?? "badger/filly/assets");
+  const appsDir = path.resolve(ROOT, args.apps ?? "badger/apps");
   const port = Number(args.port ?? 5179);
-  const cell = Number(args.cell ?? 56);
+  const body = Number(args.body ?? DEFAULT_BODY);
   await fs.mkdir(outDir, { recursive: true });
 
   const timings = new Map<FillyState, SheetTiming>();
@@ -428,48 +491,76 @@ async function main(): Promise<void> {
     await pg.close();
   }
 
-  // One crop for every state, so the feet line up when the badge swaps clips.
-  let bounds: Box | null = null;
-  for (const frames of captured.values()) for (const f of frames) bounds = unionBox(bounds, alphaBounds(f, ALPHA_THRESHOLD));
-  if (!bounds) throw new Error("no opaque pixels captured");
-  const crop = squareBox(bounds, CROP_PADDING, CAPTURE_SIZE, CAPTURE_SIZE);
-  console.log(`crop ${crop.x1 - crop.x0}px square at (${crop.x0}, ${crop.y0}) → ${cell}px cells`);
+  // One scale for every state: the idle body is `body` px tall on the badge.
+  // The anchor is the bottom centre of the idle body (the feet point).
+  let idleBounds: Box | null = null;
+  for (const f of captured.get("idle")!) idleBounds = unionBox(idleBounds, alphaBounds(f, ALPHA_THRESHOLD));
+  if (!idleBounds) throw new Error("no opaque idle pixels captured");
+  const scale = body / (idleBounds.y1 - idleBounds.y0);
+  const anchor = { x: (idleBounds.x0 + idleBounds.x1) / 2, y: idleBounds.y1 };
+  const bodyW = Math.round((idleBounds.x1 - idleBounds.x0) * scale);
+  console.log(`scale ${scale.toFixed(4)}: idle body ${bodyW}×${body} px, anchor (${anchor.x.toFixed(1)}, ${anchor.y.toFixed(1)})`);
 
-  const manifest: Manifest = { cell, baseline: 0, states: {} as Manifest["states"] };
-  let lowest = 0;
+  const manifest: Manifest = {
+    scale: Number(scale.toFixed(5)),
+    body: { w: bodyW, h: body },
+    extent: { left: 0, right: 0, up: 0, down: 0 },
+    states: {} as Manifest["states"],
+  };
+  const cells = new Map<FillyState, { cell: Cell; frames: Rgba[] }>();
   for (const plan of PLANS) {
+    // Each state gets the smallest box around all of its frames.
+    let bounds: Box | null = null;
+    for (const f of captured.get(plan.state)!) bounds = unionBox(bounds, alphaBounds(f, ALPHA_THRESHOLD));
+    if (!bounds) throw new Error(`no opaque ${plan.state} pixels captured`);
+    const cell = cellFor(bounds, anchor, scale);
+    const box = sourceBox(cell, anchor, scale);
+    const frames = captured.get(plan.state)!.map((f) => resample(f, box, cell.w, cell.h));
+    cells.set(plan.state, { cell, frames });
+
     const dir = path.join(outDir, plan.state);
     await fs.rm(dir, { recursive: true, force: true });
     await fs.mkdir(dir, { recursive: true });
-    const cells = captured.get(plan.state)!.map((f) => resampleCell(f, crop, cell));
     let bytes = 0;
-    for (let i = 0; i < cells.length; i++) {
-      const b = alphaBounds(cells[i], 255);
-      if (b && b.y1 > lowest) lowest = b.y1;
-      const png = encodePng8(cells[i]);
+    for (let i = 0; i < frames.length; i++) {
+      const png = encodePng8(frames[i]);
       bytes += png.length;
       await fs.writeFile(path.join(dir, `${String(i).padStart(2, "0")}.png`), png);
     }
     const timing = timings.get(plan.state)!;
     manifest.states[plan.state] = {
       dir: plan.state,
-      frames: cells.length,
+      frames: frames.length,
       fps: plan.fps,
       loop_start: timing.loopStart,
+      ...cell,
     };
-    console.log(`${plan.state}/: ${cells.length} frames, ${(bytes / 1024).toFixed(1)} kB`);
+    manifest.extent.left = Math.max(manifest.extent.left, -cell.ox);
+    manifest.extent.right = Math.max(manifest.extent.right, cell.ox + cell.w);
+    manifest.extent.up = Math.max(manifest.extent.up, -cell.oy);
+    manifest.extent.down = Math.max(manifest.extent.down, cell.oy + cell.h);
+    console.log(
+      `${plan.state.padEnd(10)} ${cell.w}×${cell.h} at (${cell.ox}, ${cell.oy}): ${frames.length} frames, ${(bytes / 1024).toFixed(1)} kB`,
+    );
   }
-  manifest.baseline = lowest;
   await fs.writeFile(path.join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
   console.log(path.join(outDir, "manifest.json"));
 
-  // Menu icon: the first idle frame, soft alpha, RGBA like the badge's own icons.
-  const icon = resampleCell(captured.get("idle")![0], crop, ICON_SIZE, false);
-  const iconPng = new PNG({ width: ICON_SIZE, height: ICON_SIZE });
-  iconPng.data = Buffer.from(icon.data);
-  const iconFile = path.join(outDir, "..", "icon.png");
-  await fs.writeFile(iconFile, PNG.sync.write(iconPng));
-  console.log(iconFile);
+  // Menu icons: one frame each, cropped to that frame, soft alpha, RGBA like the badge's own icons.
+  for (const spec of ICONS) {
+    const clip = manifest.states[spec.state];
+    const frame = captured.get(spec.state)![spec.frame === "first" ? 0 : clip.loop_start];
+    const bounds = alphaBounds(frame, ALPHA_THRESHOLD);
+    if (!bounds) throw new Error(`no opaque pixels for the ${spec.app} icon`);
+    const icon = resample(frame, squareBox(bounds, 8, CAPTURE_SIZE, CAPTURE_SIZE), ICON_SIZE, ICON_SIZE, false);
+    const iconPng = new PNG({ width: ICON_SIZE, height: ICON_SIZE });
+    iconPng.data = Buffer.from(icon.data);
+    const appDir = path.join(appsDir, spec.app);
+    await fs.mkdir(appDir, { recursive: true });
+    const iconFile = path.join(appDir, "icon.png");
+    await fs.writeFile(iconFile, PNG.sync.write(iconPng));
+    console.log(iconFile);
+  }
 }
 
 main().catch((err) => {
