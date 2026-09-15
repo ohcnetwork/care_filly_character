@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { FillyAnimator } from "../animation/FillyAnimator";
+import type { FillyState } from "../core/types";
 import { FillyModel } from "../model/FillyModel";
 
 /** Where the camera looks (slightly below the body centre so the feet/shadow read). */
@@ -29,6 +30,11 @@ export interface FillyFreeze {
   blink?: boolean;
   /** Optional audio level applied before stepping (e.g. talking screenshots). */
   audioLevel?: number | null;
+  /**
+   * State to enter at t = 0, after the reset. The frame then lies on the
+   * transition from the animator's initial state (transition frames, enter impulses).
+   */
+  enter?: FillyState;
 }
 
 export interface FillyScenePropsInternal {
@@ -114,19 +120,21 @@ export function FillyScene({
     };
   }, [scene, animator, invalidate]);
 
-  // Deterministic freeze frame: reset → (blink) → stepTo → request one render.
+  // Deterministic freeze frame: reset → (enter) → (blink) → stepTo → request one render.
   const freezeAt = freeze?.at;
+  const freezeEnter = freeze?.enter;
   const freezeBlink = freeze?.blink ?? false;
   const freezeAudio = freeze?.audioLevel;
   useEffect(() => {
     if (freezeAt === undefined) return;
     animator.reset();
+    if (freezeEnter !== undefined) animator.setState(freezeEnter);
     if (freezeAudio !== undefined) animator.setAudioLevel(freezeAudio);
     if (freezeBlink) animator.blink();
     animator.stepTo(freezeAt);
     modelRef.current?.applyPose(animator.pose, animator.time);
     invalidate();
-  }, [animator, freezeAt, freezeBlink, freezeAudio, invalidate]);
+  }, [animator, freezeAt, freezeEnter, freezeBlink, freezeAudio, invalidate]);
 
   const frozen = freezeAt !== undefined;
   useFrame((_state, dt) => {

@@ -68,7 +68,7 @@ import { FillyCharacter } from "@ohcnetwork/care-filly-character";
 | `dpr`                                | `number \| [min, max]`                                                                   | `[1, 2]`      | Device pixel ratio cap.                                                                                   |
 | `background`                         | `string`                                                                                 | `transparent` | Canvas CSS background.                                                                                    |
 | `className`, `style`                 | —                                                                                        | —             | Applied to the wrapper `div` (inline-block).                                                              |
-| `freezeAt`, `freezeBlink`, `onReady` | —                                                                                        | —             | Deterministic single frame (screenshots/tests).                                                           |
+| `freezeAt`, `freezeBlink`, `freezeFrom`, `onReady` | —                                                                          | —             | Deterministic single frame (screenshots/tests). `freezeFrom` starts the frame's transition in that state. |
 
 Ref handle: `{ blink(): void; setState(s): void; getAnimator(): FillyAnimator }`.
 
@@ -148,6 +148,36 @@ light rig.
 is the idle-posed mesh with PBR materials — usable in Blender, `<model-viewer>`, Spline, etc.
 Animation lives in code, not in the file. Regenerate with `npm run export:glb`.
 
+### GitHub Universe 2025 badge (`badger/`)
+
+Filly also runs as a pet app on the GitHub Universe 2025 badge (Pimoroni Tufty 2350 with MonaOS,
+[gh.io/badger](https://gh.io/badger)). The badge cannot run three.js, so `npm run export:badger`
+renders sprite sheets from the playground: one 8-bit paletted PNG per state (56×56 cells,
+transparent index 0, the format of the badge's own Mona sheets) plus `manifest.json` with the
+frame count, frame rate and loop point of each state. Reaction sheets start with the ease-in
+from idle (`freezeFrom`), then a seamless loop.
+
+```
+badger/apps/filly/
+├── __init__.py      MonaOS app (2025 badgeware API): A listen · B talk · C happy · UP think · DOWN sleep
+├── icon.png         24×24 menu icon (generated)
+└── assets/          filly-<state>.png sheets + manifest.json (generated)
+```
+
+Install on the badge:
+
+1. Connect the badge over USB-C. Press RESET 2 times. The `BADGER` disk mounts (it is `/system`).
+2. Copy `badger/apps/filly` to `/Volumes/BADGER/apps/filly`. Remove AppleDouble files:
+   `dot_clean -m /Volumes/BADGER/apps/filly`.
+3. The menu holds 6 apps. In `/Volumes/BADGER/apps/menu/__init__.py`, replace one entry with
+   `("filly", "filly")`.
+4. Eject the disk. Press RESET 1 time.
+
+The app keeps the idle sheet in RAM and decodes one reaction sheet at a time (≤ 100 kB each).
+Test without hardware with the [badge25 simulator](https://github.com/badger/home/tree/main/badge25/simulator):
+`python badge_simulator.py -C <root> <root>/apps/filly`, where `<root>` holds `apps/filly` and the
+badge's `assets/` fonts.
+
 ---
 
 ## How it is put together
@@ -158,9 +188,10 @@ src/
 ├── model/       FillyModel — three.js rig: CSG body + plate, tiles, limbs, eyes, mouth, decorations
 ├── animation/   FillyAnimator — springs + per-state targets/loops, blink, talking, pointer follow
 └── react/       <FillyCharacter> (Canvas, lights, env, frame loop), <FillyMascot>
-playground/      dev page: interactive / ?state=&t= frames / ?sheet=1 / ?export=1
+playground/      dev page: interactive / ?state=&t=[&from=] frames / ?sheet=1 / ?export=1
 scripts/         harness.mts (vite + headless Chromium), snapshot.mts (screenshots),
-                 export-glb.mts (.glb), singlefile.mts (one-file demo page)
+                 export-glb.mts (.glb), export-badger.mts (badge sprite sheets), singlefile.mts (one-file demo page)
+badger/          GitHub Universe 2025 badge app + generated sprite sheets
 docs/superpowers/specs/   design spec
 ```
 
@@ -186,15 +217,17 @@ npm run snapshot     # screenshots/*.png + sheet.png (headless Chromium)
 npm run build        # dist/index.js + d.ts
 npm run build:playground # dist-playground/ — static site for Cloudflare Pages
 npm run export:glb   # dist/filly-mascot.glb
+npm run export:badger # badger/apps/filly/{icon.png,assets/} — sprite sheets for the Universe 2025 badge (~10 min)
 npm run build:all    # clean + build + export:glb
 npm run build:demo   # dist-playground/filly-playground.html — the playground as ONE self-contained file
 ```
 
-`snapshot`, `export:glb` and `build:demo` drive headless Chromium through Playwright; on a fresh
+`snapshot`, `export:glb`, `export:badger` and `build:demo` drive headless Chromium through Playwright; on a fresh
 machine run `npx playwright install chromium` once. `prepublishOnly` runs `build:all`, so
 publishing also needs Chromium available.
 
 Playground URLs: `/` interactive · `/?state=happy&t=1.2` deterministic frame ·
+`/?state=happy&t=0.3&from=idle` frame on the idle → happy transition ·
 `/?sheet=1` all states in the reference layout · `/?export=1` GLB export hook.
 
 ## Cloudflare Pages

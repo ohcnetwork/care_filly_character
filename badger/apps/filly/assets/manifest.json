@@ -1,0 +1,62 @@
+{
+  "cell": 56,
+  "baseline": 55,
+  "sheets": {
+    "idle": {
+      "file": "filly-idle.png",
+      "frames": 32,
+      "cols": 8,
+      "rows": 4,
+      "fps": 8,
+      "loop_start": 0
+    },
+    "listening": {
+      "file": "filly-listening.png",
+      "frames": 24,
+      "cols": 8,
+      "rows": 3,
+      "fps": 10,
+      "loop_start": 14
+    },
+    "talking": {
+      "file": "filly-talking.png",
+      "frames": 30,
+      "cols": 8,
+      "rows": 4,
+      "fps": 10,
+      "loop_start": 10
+    },
+    "happy": {
+      "file": "filly-happy.png",
+      "frames": 21,
+      "cols": 8,
+      "rows": 3,
+      "fps": 10,
+      "loop_start": 14
+    },
+    "thinking": {
+      "file": "filly-thinking.png",
+      "frames": 30,
+      "cols": 8,
+      "rows": 4,
+      "fps": 10,
+      "loop_start": 10
+    },
+    "surprised": {
+      "file": "filly-surprised.png",
+      "frames": 15,
+      "cols": 8,
+      "rows": 2,
+      "fps": 10,
+      "loop_start": 14
+    },
+    "sleepy": {
+      "file": "filly-sleepy.png",
+      "frames": 30,
+      "cols": 8,
+      "rows": 4,
+      "fps": 3,
+      "loop_start": 5
+    }
+  }
+}

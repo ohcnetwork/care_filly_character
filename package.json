@@ -34,7 +34,8 @@
     "build:all": "npm run clean && npm run build && npm run export:glb",
     "prepublishOnly": "npm run build:all",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "build:demo": "npm run build:playground && tsx scripts/singlefile.mts"
+    "build:demo": "npm run build:playground && tsx scripts/singlefile.mts",
+    "export:badger": "tsx scripts/export-badger.mts"
   },
   "peerDependencies": {
     "@react-three/fiber": ">=9.0.0",
@@ -50,12 +51,14 @@
     "@phosphor-icons/react": "^2.1.10",
     "@react-three/fiber": "^9.7.0",
     "@types/node": "^22.14.0",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.2",
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9.30.0",
     "playwright": "1.61.1",
+    "pngjs": "^7.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "three": "^0.185.1",
