@@ -24,15 +24,22 @@ Arguments:
     --state     JSON file to load as the saved State of the app before start
                 (for apps that use badgeware.State). The file name given to
                 State.load must equal the app name.
+    --seed      Seed for the random module, for repeatable runs.
+    --dump      Comma-separated names of module globals to print after the run
+                (for example --dump mode,score,best).
+    --extra-app Path of an app directory outside the repo. It appears in
+                /system/apps under its own name. Repeat for more apps. The app
+                to run can be one of them (for example the menu of badger/home).
 
 Requirements: Python 3.13 and pygame 2.6 (pygame does not import on 3.14).
 The system root that maps to /system is a temporary directory with links to
-badger/apps, badger/filly and the simulator fonts.
+each app in badger/apps, to badger/filly and to the simulator assets.
 """
 
 import argparse
 import importlib.util
 import os
+import random
 import shutil
 import sys
 import tempfile
@@ -69,13 +76,24 @@ def parse_keys(script, fps):
     return schedule
 
 
-def make_root(home):
-    """Build a temporary /system root: apps and filly from the repo, fonts from badger/home."""
+def make_root(home, extra_apps=()):
+    """Build a temporary /system root: apps and filly from the repo, assets from badger/home.
+
+    `extra_apps` are paths of app directories outside the repo (for example the
+    menu of badger/home). They appear in /system/apps under their own names.
+    """
     root = tempfile.mkdtemp(prefix="filly-sim-")
-    os.symlink(os.path.join(BADGER, "apps"), os.path.join(root, "apps"))
+    apps = os.path.join(root, "apps")
+    os.mkdir(apps)
+    repo_apps = os.path.join(BADGER, "apps")
+    for name in os.listdir(repo_apps):
+        if os.path.isdir(os.path.join(repo_apps, name)):
+            os.symlink(os.path.join(repo_apps, name), os.path.join(apps, name))
+    for path in extra_apps:
+        path = os.path.abspath(path)
+        os.symlink(path, os.path.join(apps, os.path.basename(path)))
     os.symlink(os.path.join(BADGER, "filly"), os.path.join(root, "filly"))
-    os.mkdir(os.path.join(root, "assets"))
-    os.symlink(os.path.join(home, "badge25", "assets", "fonts"), os.path.join(root, "assets", "fonts"))
+    os.symlink(os.path.join(home, "badge25", "assets"), os.path.join(root, "assets"))
     return root
 
 
@@ -117,11 +135,22 @@ def main():
     parser.add_argument("--shots", default="")
     parser.add_argument("--out", default=os.path.join(tempfile.gettempdir(), "filly-sim-out"))
     parser.add_argument("--state")
+    parser.add_argument("--seed", type=int, help="seed for the random module, for repeatable runs")
+    parser.add_argument("--dump", default="", help="comma-separated module globals to print after the run")
+    parser.add_argument(
+        "--extra-app",
+        action="append",
+        default=[],
+        help="path of an app directory outside the repo to add to /system/apps (repeatable)",
+    )
     args = parser.parse_args()
     if not args.home:
         raise SystemExit("set --home or BADGER_HOME to a clone of https://github.com/badger/home")
 
     app_dir = os.path.join(BADGER, "apps", args.app)
+    extra = [p for p in args.extra_app if os.path.basename(os.path.abspath(p)) == args.app]
+    if extra:
+        app_dir = os.path.abspath(extra[0])
     if not os.path.isfile(os.path.join(app_dir, "__init__.py")):
         raise SystemExit("no app at {}".format(app_dir))
 
@@ -130,7 +159,7 @@ def main():
     import pygame
 
     sim = load_simulator(args.home)
-    root = make_root(args.home)
+    root = make_root(args.home, args.extra_app)
     os.makedirs(args.out, exist_ok=True)
     if args.state:
         state_dir = os.path.join(root, ".badge_state")
@@ -182,6 +211,8 @@ def main():
     total_frames = int(args.seconds * args.fps)
     frames_done = 0
     module = None
+    if args.seed is not None:
+        random.seed(args.seed)
     try:
         module = sim.load_game_module(os.path.join(root, "apps", args.app, "__init__.py"))
         init = getattr(module, "init", None)
@@ -207,6 +238,8 @@ def main():
         print("FAIL: {} raised after {} frames".format(args.app, frames_done))
         return 1
     finally:
+        for name in filter(None, (n.strip() for n in args.dump.split(","))):
+            print("{} = {!r}".format(name, getattr(module, name, "<missing>")))
         on_exit = getattr(module, "on_exit", None) if module else None
         if callable(on_exit):
             on_exit()

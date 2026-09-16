@@ -4,8 +4,11 @@
  * directory per state, plus `manifest.json`.
  *
  *   npm run export:badger [-- --out badger/filly/assets] [--apps badger/apps] [--port 5179] [--body 72]
+ *                         [--targets frames,icons,flappy]
  *
- * Also writes the 24×24 `icon.png` of each badge app (see ICONS).
+ * Also writes the 24×24 `icon.png` of each badge app (see ICONS) and the small
+ * sprite sheet of the flappy-filly game (see FLAPPY). `--targets` limits the
+ * run to some outputs; only the states those outputs need are captured.
  *
  * Why single frames: the badge's MicroPython heap is ~240 kB and fragmented
  * (largest free block ≈ 48 kB), so a per-state sprite sheet cannot be decoded.
@@ -54,12 +57,40 @@ const CROP_PADDING = 1;
 /** Height of the idle body on the badge (px). The badge screen is 160×120. */
 const DEFAULT_BODY = 72;
 
-/** Menu icon of each badge app: a frame of one state, cropped to that frame. */
-const ICONS: readonly { app: string; state: FillyState; frame: "first" | "loop" }[] = [
+/** Menu icon of each badge app: a frame of one state, cropped to that frame. `peak` = the loop frame that reaches highest. */
+const ICONS: readonly { app: string; state: FillyState; frame: "first" | "loop" | "peak" }[] = [
   { app: "filly-mascot", state: "idle", frame: "first" },
   { app: "filly-pulse", state: "surprised", frame: "loop" },
   { app: "filly-pet", state: "happy", frame: "loop" },
+  { app: "flappy-filly", state: "happy", frame: "peak" },
 ];
+
+/**
+ * Sprite sheet of the flappy-filly game: one row of square cells at a smaller
+ * scale, because the pillar gap is 52 px. Each cell holds one frame cropped to
+ * itself: centred left to right, feet 1 px above the cell bottom, like the
+ * badge's own 24 px Mona sheet. Cells, in order: the `flap` frames, then the
+ * hit frame (surprised, held frame). The game picks a flap frame from the
+ * vertical speed, like Mona's flying-to-falling row.
+ */
+const FLAPPY = {
+  app: "flappy-filly",
+  file: "assets/filly.png",
+  /** Height of the idle body in a cell (px). Mona's flappy sprite is 24 px. */
+  body: 24,
+  /** Cell size (px). The tallest pose (surprised) is 29 px at this body height. */
+  cell: 32,
+  /**
+   * Frames of the happy loop as indexes from its loop start, in the order
+   * rise (stretched, on the way up), float (top of the bounce), sink (on the
+   * way down), fall (the landing squash). The happy plan has a fixed lead, so
+   * the loop start and the phase are the same on every export.
+   */
+  flap: [1, 3, 5, 0],
+} as const;
+
+type Target = "frames" | "icons" | "flappy";
+const TARGETS: readonly Target[] = ["frames", "icons", "flappy"];
 
 interface SheetPlan {
   state: FillyState;
@@ -320,6 +351,44 @@ function resample(src: Rgba, box: Box, w: number, h: number, binaryAlpha = true)
   return { width: w, height: h, data: out };
 }
 
+/** Index of the loop frame that reaches highest (smallest top edge): the top of a bounce. */
+function peakFrame(frames: Rgba[], loopStart: number): number {
+  let best = loopStart;
+  let top = Infinity;
+  for (let i = loopStart; i < frames.length; i++) {
+    const bounds = alphaBounds(frames[i], ALPHA_THRESHOLD);
+    if (bounds && bounds.y0 < top) {
+      top = bounds.y0;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** One flappy cell: the frame cropped to itself, centred left to right, feet 1 px above the bottom. */
+function flappyCell(frame: Rgba, scale: number, cell: number): Rgba {
+  const bounds = alphaBounds(frame, ALPHA_THRESHOLD);
+  if (!bounds) throw new Error("no opaque pixels for a flappy cell");
+  const w = (bounds.x1 - bounds.x0) * scale;
+  const h = (bounds.y1 - bounds.y0) * scale;
+  if (w > cell || h > cell - 1) throw new Error(`flappy frame ${w.toFixed(1)}×${h.toFixed(1)} px does not fit a ${cell} px cell`);
+  const size = cell / scale;
+  const cx = (bounds.x0 + bounds.x1) / 2;
+  const y1 = bounds.y1 + 1 / scale;
+  return resample(frame, { x0: cx - size / 2, y0: y1 - size, x1: cx + size / 2, y1 }, cell, cell);
+}
+
+/** Square cells side by side in one row. */
+function packRow(cells: Rgba[]): Rgba {
+  const size = cells[0].width;
+  const width = size * cells.length;
+  const out = new Uint8Array(width * size * 4);
+  cells.forEach((c, i) => {
+    for (let y = 0; y < size; y++) out.set(c.data.subarray(y * size * 4, (y + 1) * size * 4), (y * width + i * size) * 4);
+  });
+  return { width, height: size, data: out };
+}
+
 // ── PNG8 + tRNS ───────────────────────────────────────────────────────────────
 
 /** Median-cut palette of at most `maxColours` RGB entries for the opaque pixels. */
@@ -443,10 +512,21 @@ async function main(): Promise<void> {
   const appsDir = path.resolve(ROOT, args.apps ?? "badger/apps");
   const port = Number(args.port ?? 5179);
   const body = Number(args.body ?? DEFAULT_BODY);
-  await fs.mkdir(outDir, { recursive: true });
+  const targets = new Set<Target>();
+  for (const name of (args.targets ?? TARGETS.join(",")).split(",")) {
+    if (!TARGETS.includes(name as Target)) throw new Error(`unknown target ${name}; use ${TARGETS.join(", ")}`);
+    targets.add(name as Target);
+  }
+
+  // Idle is always captured: it sets the scale and the anchor.
+  const needed = new Set<FillyState>(["idle"]);
+  if (targets.has("frames")) for (const plan of PLANS) needed.add(plan.state);
+  if (targets.has("icons")) for (const spec of ICONS) needed.add(spec.state);
+  if (targets.has("flappy")) for (const state of ["happy", "surprised"] as const) needed.add(state);
+  const plans = PLANS.filter((plan) => needed.has(plan.state));
 
   const timings = new Map<FillyState, SheetTiming>();
-  for (const plan of PLANS) {
+  for (const plan of plans) {
     const timing = planTiming(plan);
     timings.set(plan.state, timing);
     console.log(
@@ -469,7 +549,7 @@ async function main(): Promise<void> {
     await wrapper.waitFor({ state: "attached", timeout: READY_TIMEOUT });
     await page.addStyleTag({ content: "html, body, .frame { background: transparent !important; }" });
 
-    for (const plan of PLANS) {
+    for (const plan of plans) {
       const timing = timings.get(plan.state)!;
       const frames: Rgba[] = [];
       for (const t of timing.times) {
@@ -507,8 +587,7 @@ async function main(): Promise<void> {
     extent: { left: 0, right: 0, up: 0, down: 0 },
     states: {} as Manifest["states"],
   };
-  const cells = new Map<FillyState, { cell: Cell; frames: Rgba[] }>();
-  for (const plan of PLANS) {
+  for (const plan of targets.has("frames") ? PLANS : []) {
     // Each state gets the smallest box around all of its frames.
     let bounds: Box | null = null;
     for (const f of captured.get(plan.state)!) bounds = unionBox(bounds, alphaBounds(f, ALPHA_THRESHOLD));
@@ -516,7 +595,6 @@ async function main(): Promise<void> {
     const cell = cellFor(bounds, anchor, scale);
     const box = sourceBox(cell, anchor, scale);
     const frames = captured.get(plan.state)!.map((f) => resample(f, box, cell.w, cell.h));
-    cells.set(plan.state, { cell, frames });
 
     const dir = path.join(outDir, plan.state);
     await fs.rm(dir, { recursive: true, force: true });
@@ -543,13 +621,34 @@ async function main(): Promise<void> {
       `${plan.state.padEnd(10)} ${cell.w}×${cell.h} at (${cell.ox}, ${cell.oy}): ${frames.length} frames, ${(bytes / 1024).toFixed(1)} kB`,
     );
   }
-  await fs.writeFile(path.join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
-  console.log(path.join(outDir, "manifest.json"));
+  if (targets.has("frames")) {
+    await fs.writeFile(path.join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+    console.log(path.join(outDir, "manifest.json"));
+  }
+
+  // Flappy sheet: small cells at their own scale, one PNG8 the game keeps in RAM.
+  if (targets.has("flappy")) {
+    const flappyScale = FLAPPY.body / (idleBounds.y1 - idleBounds.y0);
+    const happy = captured.get("happy")!;
+    const surprised = captured.get("surprised")!;
+    const loopStart = timings.get("happy")!.loopStart;
+    const loopLength = happy.length - loopStart;
+    const picks = [...FLAPPY.flap.map((i) => happy[loopStart + (i % loopLength)]), surprised[surprised.length - 1]];
+    const sheet = encodePng8(packRow(picks.map((frame) => flappyCell(frame, flappyScale, FLAPPY.cell))));
+    const file = path.join(appsDir, FLAPPY.app, FLAPPY.file);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, sheet);
+    console.log(
+      `${file}: ${picks.length} cells of ${FLAPPY.cell}×${FLAPPY.cell} px (happy loop #${loopStart}+${FLAPPY.flap.join(",")}), ${(sheet.length / 1024).toFixed(1)} kB`,
+    );
+  }
 
   // Menu icons: one frame each, cropped to that frame, soft alpha, RGBA like the badge's own icons.
-  for (const spec of ICONS) {
-    const clip = manifest.states[spec.state];
-    const frame = captured.get(spec.state)![spec.frame === "first" ? 0 : clip.loop_start];
+  for (const spec of targets.has("icons") ? ICONS : []) {
+    const frames = captured.get(spec.state)!;
+    const loopStart = timings.get(spec.state)!.loopStart;
+    const index = spec.frame === "first" ? 0 : spec.frame === "loop" ? loopStart : peakFrame(frames, loopStart);
+    const frame = frames[index];
     const bounds = alphaBounds(frame, ALPHA_THRESHOLD);
     if (!bounds) throw new Error(`no opaque pixels for the ${spec.app} icon`);
     const icon = resample(frame, squareBox(bounds, 8, CAPTURE_SIZE, CAPTURE_SIZE), ICON_SIZE, ICON_SIZE, false);

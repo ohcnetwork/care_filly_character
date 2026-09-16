@@ -165,12 +165,14 @@ badger/
 ├── apps/
 │   ├── filly-mascot/    A listen · B talk · C happy · UP think · DOWN sleep
 │   ├── filly-pulse/     ECG rhythm game
-│   └── filly-pet/       care companion with saved vitals
+│   ├── filly-pet/       care companion with saved vitals
+│   └── flappy-filly/    flappy game with a 5-cell sprite sheet (generated, 2.8 kB)
 └── tools/simulate.py    headless test harness for the badge25 simulator
 ```
 
-Each app has an `__init__.py` and a generated 24×24 `icon.png`. The 3 apps share one copy of the
-frames through `fillylib`.
+Each app has an `__init__.py` and a generated 24×24 `icon.png`. The 3 mascot apps share one copy
+of the frames through `fillylib`. The flappy game has its own small sprite sheet at a 24 px body
+height, like the badge's own Mona flappy sprite.
 
 **Frame format.** One scale for every state: the idle body is 72 px tall (60 % of the 120 px
 screen). Each state has its own crop box, so the idle body does not shrink to make room for the
@@ -180,8 +182,9 @@ The anchor is the feet point: the bottom centre of the idle body. An app blits a
 gives the farthest reach from the anchor over all states (45 px left and right, 85 px up).
 
 **Memory.** The MicroPython heap on the badge is about 240 kB and fragmented (largest free block
-about 48 kB), so no sprite sheet stays in RAM. `fillylib.Clip` decodes the frame on screen from
-flash (about 20 ms and 8 kB for the largest 90×83 frame), like the MonaOS startup animation.
+about 48 kB), so no large sprite sheet stays in RAM. `fillylib.Clip` decodes the frame on screen
+from flash (about 20 ms and 8 kB for the largest 90×83 frame), like the MonaOS startup animation.
+The flappy sheet is 160×32 px (about 5 kB decoded), so it stays in RAM.
 
 #### filly-mascot
 
@@ -205,13 +208,29 @@ play with Filly (JOY goes up, REST goes down). Press C to start a rest (REST goe
 wakes Filly. Press UP or DOWN to show the age and the care count. The badge saves the state in
 `filly-pet` after each action, every 30 s, and on HOME.
 
+#### flappy-filly
+
+Filly flies between the pillars, like the badge's flappy mona. Press A to flap. Filly falls with
+gravity. Each pillar has a gap of 52 px. Filly gets 1 point for each pillar. The pillars move at
+40 px/s at the start and get faster with the score, up to 80 px/s. A hit on a pillar or on the
+floor ends the round: Filly shows the surprised face and falls. Press A on the game-over panel to
+play again. The badge saves the best score in the `flappy-filly` state.
+
+The sprite is a 5-cell sheet: rise, float, sink and fall from the happy bounce, and hit from the
+surprised clip. The game picks a cell from the vertical speed, as the Mona sprite does. Speeds
+are in px/s, so the game feels the same at every frame rate.
+
 **Install on the badge:**
 
 1. Connect the badge over USB-C. Press RESET 2 times. The `BADGER` disk mounts (it is `/system`).
 2. Copy `badger/filly` to `/Volumes/BADGER/filly`. Copy each app directory from `badger/apps/` to
    `/Volumes/BADGER/apps/`. Remove AppleDouble files: `dot_clean -m /Volumes/BADGER`.
-3. The menu holds 6 apps. In `/Volumes/BADGER/apps/menu/__init__.py`, replace 3 entries with
-   `("filly", "filly-mascot")`, `("filly pulse", "filly-pulse")` and `("filly pet", "filly-pet")`.
+3. The MonaOS 4.03 menu holds 6 apps in a fixed list. Do one of these:
+   - Copy the newer menu from [badger/home](https://github.com/badger/home/tree/main/badge25/apps/menu)
+     (`badge25/apps/menu/`, 4 files) over `/Volumes/BADGER/apps/menu/`. This menu finds every
+     app in `/system/apps` and shows 6 per page. Back up the old menu directory first.
+   - Or, in `/Volumes/BADGER/apps/menu/__init__.py`, replace entries in the list with
+     `("filly", "filly-mascot")`, `("flappy filly", "flappy-filly")` and so on.
 4. Eject the disk. Press RESET 1 time.
 
 **Debug.** To see an app error, read the badge's USB serial port (`cat /dev/cu.usbmodem*`):
@@ -228,6 +247,9 @@ BADGER_HOME=/path/to/badger-home python badger/tools/simulate.py filly-mascot \
 ```
 
 The run ends with `OK:` (and the number of frame decodes) or `FAIL:` with the traceback.
+`--seed` makes a game run repeatable. `--dump mode,score` prints module globals at the end.
+`--extra-app DIR` adds an app from outside the repo, for example the menu of `badger/home`, which
+then shows the Filly apps next to the stock apps.
 
 ---
 
