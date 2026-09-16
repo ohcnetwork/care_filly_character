@@ -17,7 +17,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { FillyAnimator } from "../animation/FillyAnimator";
-import type { FillyState } from "../core/types";
+import type { FillyPose, FillyState } from "../core/types";
 import { useOnScreen, usePointerFollow } from "./hooks";
 import {
   CAMERA_FOV,
@@ -63,6 +63,11 @@ export interface FillyCharacterProps {
    * frame lies on the transition (spring ease-in, enter impulse).
    */
   freezeFrom?: FillyState;
+  /**
+   * With `freezeAt`: pose values that replace the animator's values in the
+   * frame (for sprites of poses the animator has no state for).
+   */
+  freezePose?: Partial<FillyPose>;
   /** Device pixel ratio or [min, max] range (default [1, 2]). */
   dpr?: number | [number, number];
   /** CSS background of the canvas (default transparent). */
@@ -104,6 +109,7 @@ export const FillyCharacter = forwardRef<
     freezeAt,
     freezeBlink = false,
     freezeFrom,
+    freezePose,
     dpr = [1, 2],
     background = "transparent",
     onReady,
@@ -226,9 +232,10 @@ export const FillyCharacter = forwardRef<
             blink: freezeBlink,
             audioLevel,
             enter: frozenFrom !== null && frozenFrom !== state ? state : undefined,
+            pose: freezePose,
           }
         : undefined,
-    [frozen, freezeAt, freezeBlink, audioLevel, frozenFrom, state],
+    [frozen, freezeAt, freezeBlink, audioLevel, frozenFrom, state, freezePose],
   );
 
   const css = toCssSize(size);

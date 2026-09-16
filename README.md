@@ -166,13 +166,17 @@ badger/
 │   ├── filly-mascot/    A listen · B talk · C happy · UP think · DOWN sleep
 │   ├── filly-pulse/     ECG rhythm game
 │   ├── filly-pet/       care companion with saved vitals
-│   └── flappy-filly/    flappy game with a 5-cell sprite sheet (generated, 2.8 kB)
+│   ├── flappy-filly/    flappy game with a 5-cell sprite sheet (generated, 2.8 kB)
+│   └── filly-run/       runner game with a 9-cell sprite sheet (generated, 5.5 kB)
 └── tools/simulate.py    headless test harness for the badge25 simulator
 ```
 
 Each app has an `__init__.py` and a generated 24×24 `icon.png`. The 3 mascot apps share one copy
-of the frames through `fillylib`. The flappy game has its own small sprite sheet at a 24 px body
-height, like the badge's own Mona flappy sprite.
+of the frames through `fillylib`. Each game has its own small sprite sheet: one row of square
+cells at a smaller body height (24 px for flappy, 36 px for run), like the badge's own Mona flappy
+sprite. The exporter builds a sheet from the `SHEETS` spec: frames of a state's loop, the held
+frame of a one-shot state, or an extra capture with pose values the animator has no state for
+(the duck of `filly-run`).
 
 **Frame format.** One scale for every state: the idle body is 72 px tall (60 % of the 120 px
 screen). Each state has its own crop box, so the idle body does not shrink to make room for the
@@ -184,7 +188,8 @@ gives the farthest reach from the anchor over all states (45 px left and right, 
 **Memory.** The MicroPython heap on the badge is about 240 kB and fragmented (largest free block
 about 48 kB), so no large sprite sheet stays in RAM. `fillylib.Clip` decodes the frame on screen
 from flash (about 20 ms and 8 kB for the largest 90×83 frame), like the MonaOS startup animation.
-The flappy sheet is 160×32 px (about 5 kB decoded), so it stays in RAM.
+The game sheets are small (160×32 px for flappy, 432×48 px for run: about 5 kB and 20 kB decoded),
+so they stay in RAM.
 
 #### filly-mascot
 
@@ -219,6 +224,21 @@ play again. The badge saves the best score in the `flappy-filly` state.
 The sprite is a 5-cell sheet: rise, float, sink and fall from the happy bounce, and hit from the
 surprised clip. The game picks a cell from the vertical speed, as the Mona sprite does. Speeds
 are in px/s, so the game feels the same at every frame rate.
+
+#### filly-run
+
+Filly runs through a desert, like the Chrome dinosaur game. Press A or UP to jump. Hold DOWN to
+duck, or to drop faster in the air. Cacti come alone or in groups. Birds come after 300 points at
+3 heights: jump over a low bird, duck under a mid bird, run under a high bird. The score counts the
+distance. The speed goes up from 100 px/s to 190 px/s. Every 500 points the sky changes between
+day and night. A hit freezes the game and shows the surprised face. Press A on the game-over panel
+to play again. The badge saves the best score in the `filly-run` state.
+
+Filly has no legs, so the run cycle is the happy bounce: 7 frames at a 36 px body height. The
+sheet has 2 more cells: hit and duck. The duck is a real pose of the character: the exporter
+captures the idle frame with a squashed body, ears back and a small lean, through the `pose`
+field of `window.__fillyFrame`. Each cell is anchor aligned: the feet point is 1 px above the
+bottom centre of the cell, so the bounce lifts the body in the cell.
 
 **Install on the badge:**
 

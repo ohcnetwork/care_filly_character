@@ -4,11 +4,11 @@
  * directory per state, plus `manifest.json`.
  *
  *   npm run export:badger [-- --out badger/filly/assets] [--apps badger/apps] [--port 5179] [--body 72]
- *                         [--targets frames,icons,flappy]
+ *                         [--targets frames,icons,flappy,run]
  *
  * Also writes the 24×24 `icon.png` of each badge app (see ICONS) and the small
- * sprite sheet of the flappy-filly game (see FLAPPY). `--targets` limits the
- * run to some outputs; only the states those outputs need are captured.
+ * sprite sheets of the games (see SHEETS). `--targets` limits the run to some
+ * outputs; only the states those outputs need are captured.
  *
  * Why single frames: the badge's MicroPython heap is ~240 kB and fragmented
  * (largest free block ≈ 48 kB), so a per-state sprite sheet cannot be decoded.
@@ -63,34 +63,93 @@ const ICONS: readonly { app: string; state: FillyState; frame: "first" | "loop" 
   { app: "filly-pulse", state: "surprised", frame: "loop" },
   { app: "filly-pet", state: "happy", frame: "loop" },
   { app: "flappy-filly", state: "happy", frame: "peak" },
+  { app: "filly-run", state: "happy", frame: "loop" },
 ];
 
-/**
- * Sprite sheet of the flappy-filly game: one row of square cells at a smaller
- * scale, because the pillar gap is 52 px. Each cell holds one frame cropped to
- * itself: centred left to right, feet 1 px above the cell bottom, like the
- * badge's own 24 px Mona sheet. Cells, in order: the `flap` frames, then the
- * hit frame (surprised, held frame). The game picks a flap frame from the
- * vertical speed, like Mona's flying-to-falling row.
- */
-const FLAPPY = {
-  app: "flappy-filly",
-  file: "assets/filly.png",
-  /** Height of the idle body in a cell (px). Mona's flappy sprite is 24 px. */
-  body: 24,
-  /** Cell size (px). The tallest pose (surprised) is 29 px at this body height. */
-  cell: 32,
-  /**
-   * Frames of the happy loop as indexes from its loop start, in the order
-   * rise (stretched, on the way up), float (top of the bounce), sink (on the
-   * way down), fall (the landing squash). The happy plan has a fixed lead, so
-   * the loop start and the phase are the same on every export.
-   */
-  flap: [1, 3, 5, 0],
-} as const;
+/** One cell of a game sprite sheet. */
+type SheetCell =
+  /** A frame of the state's loop, as an index from the loop start (wraps). */
+  | { state: FillyState; loop: number }
+  /** The held last frame of a one-shot state. */
+  | { state: FillyState; last: true }
+  /** An extra capture: the state at time `t` with these pose values replaced. */
+  | { state: FillyState; t: number; pose: Partial<FillyPose> };
 
-type Target = "frames" | "icons" | "flappy";
-const TARGETS: readonly Target[] = ["frames", "icons", "flappy"];
+/**
+ * A game sprite sheet: one row of square cells at its own scale, one PNG8 the
+ * game keeps in RAM. `align` says where a frame sits in its cell:
+ * - `feet`: the frame cropped to itself, centred left to right, its lowest
+ *   pixel 1 px above the cell bottom, like the badge's own 24 px Mona sheet.
+ *   A bounce does not move the body in the cell.
+ * - `anchor`: the shared feet point (bottom centre of the idle body) 1 px above
+ *   the cell's bottom centre, so a frame keeps its true position: a bounce
+ *   lifts the body in the cell, and cells of different states line up.
+ */
+interface SheetSpec {
+  app: string;
+  file: string;
+  /** Height of the idle body in a cell (px). */
+  body: number;
+  /** Cell size (px): the tallest pose must fit. */
+  cell: number;
+  align: "feet" | "anchor";
+  cells: readonly SheetCell[];
+}
+
+/**
+ * The happy loop is a bounce: 0 landing squash, 1 stretched on the way up,
+ * 2–4 in the air (3 is the top), 5 on the way down, 6 about to land. The happy
+ * plan has a fixed lead, so the loop start and the phase are the same on every
+ * export.
+ */
+const hop = (loop: number): SheetCell => ({ state: "happy", loop });
+
+/**
+ * Duck pose of the runner. The body pivot is at the feet, so a smaller
+ * `bodyScaleY` squashes the body toward the floor; the wider `bodyScaleX`
+ * keeps the volume. Ears back, a small lean toward the viewer, arms a bit out.
+ */
+const DUCK_POSE: Partial<FillyPose> = {
+  bodyScaleY: 0.62,
+  bodyScaleX: 1.22,
+  bodyPitch: 0.18,
+  earL: -0.45,
+  earR: -0.45,
+  armL: 0.25,
+  armR: 0.25,
+};
+
+const SHEETS = {
+  /**
+   * flappy-filly: the pillar gap is 52 px, so the body is 24 px like Mona's
+   * flappy sprite. Cells: rise, float, sink, fall (picked from the vertical
+   * speed, like Mona's flying-to-falling row), then hit.
+   */
+  flappy: {
+    app: "flappy-filly",
+    file: "assets/filly.png",
+    body: 24,
+    cell: 32, // the tallest pose (surprised) is 29 px at this body height
+    align: "feet",
+    cells: [hop(1), hop(3), hop(5), hop(0), { state: "surprised", last: true }],
+  },
+  /**
+   * filly-run: Filly hops along the ground (Filly has no legs), so the whole
+   * happy loop is the run cycle; a jump picks a cell from the vertical speed.
+   * Cells: hop 0–6, hit, duck.
+   */
+  run: {
+    app: "filly-run",
+    file: "assets/filly.png",
+    body: 36,
+    cell: 48, // the highest reach from the feet point (happy, surprised) is 43 px at this body height
+    align: "anchor",
+    cells: [...[0, 1, 2, 3, 4, 5, 6].map(hop), { state: "surprised", last: true }, { state: "idle", t: 1, pose: DUCK_POSE }],
+  },
+} satisfies Record<string, SheetSpec>;
+
+type Target = "frames" | "icons" | keyof typeof SHEETS;
+const TARGETS: readonly Target[] = ["frames", "icons", "flappy", "run"];
 
 interface SheetPlan {
   state: FillyState;
@@ -159,6 +218,7 @@ interface FramePage {
     from?: FillyState;
     audioLevel: number | null;
     blink: boolean;
+    pose: Partial<FillyPose> | null;
   }) => Promise<void>;
 }
 declare const window: FramePage;
@@ -365,17 +425,20 @@ function peakFrame(frames: Rgba[], loopStart: number): number {
   return best;
 }
 
-/** One flappy cell: the frame cropped to itself, centred left to right, feet 1 px above the bottom. */
-function flappyCell(frame: Rgba, scale: number, cell: number): Rgba {
+/** One sheet cell (see SheetSpec.align). `anchor` is the feet point in capture px. */
+function sheetCell(frame: Rgba, scale: number, cell: number, align: SheetSpec["align"], anchor: { x: number; y: number }): Rgba {
   const bounds = alphaBounds(frame, ALPHA_THRESHOLD);
-  if (!bounds) throw new Error("no opaque pixels for a flappy cell");
-  const w = (bounds.x1 - bounds.x0) * scale;
-  const h = (bounds.y1 - bounds.y0) * scale;
-  if (w > cell || h > cell - 1) throw new Error(`flappy frame ${w.toFixed(1)}×${h.toFixed(1)} px does not fit a ${cell} px cell`);
+  if (!bounds) throw new Error("no opaque pixels for a sheet cell");
   const size = cell / scale;
-  const cx = (bounds.x0 + bounds.x1) / 2;
-  const y1 = bounds.y1 + 1 / scale;
-  return resample(frame, { x0: cx - size / 2, y0: y1 - size, x1: cx + size / 2, y1 }, cell, cell);
+  const cx = align === "feet" ? (bounds.x0 + bounds.x1) / 2 : anchor.x;
+  const y1 = (align === "feet" ? bounds.y1 : anchor.y) + 1 / scale;
+  const box = { x0: cx - size / 2, y0: y1 - size, x1: cx + size / 2, y1 };
+  if (bounds.x0 < box.x0 || bounds.x1 > box.x1 || bounds.y0 < box.y0 || bounds.y1 > box.y1) {
+    const w = (bounds.x1 - bounds.x0) * scale;
+    const h = (bounds.y1 - bounds.y0) * scale;
+    throw new Error(`sheet frame ${w.toFixed(1)}×${h.toFixed(1)} px (${align} aligned) does not fit a ${cell} px cell`);
+  }
+  return resample(frame, box, cell, cell);
 }
 
 /** Square cells side by side in one row. */
@@ -522,7 +585,8 @@ async function main(): Promise<void> {
   const needed = new Set<FillyState>(["idle"]);
   if (targets.has("frames")) for (const plan of PLANS) needed.add(plan.state);
   if (targets.has("icons")) for (const spec of ICONS) needed.add(spec.state);
-  if (targets.has("flappy")) for (const state of ["happy", "surprised"] as const) needed.add(state);
+  const sheets = (Object.keys(SHEETS) as (keyof typeof SHEETS)[]).filter((name) => targets.has(name)).map((name) => SHEETS[name]);
+  for (const sheet of sheets) for (const cell of sheet.cells) needed.add(cell.state);
   const plans = PLANS.filter((plan) => needed.has(plan.state));
 
   const timings = new Map<FillyState, SheetTiming>();
@@ -537,6 +601,7 @@ async function main(): Promise<void> {
   const pg = await startPlayground(port);
   const browser = await launchBrowser();
   const captured = new Map<FillyState, Rgba[]>();
+  const posed = new Map<SheetCell, Rgba>();
   try {
     const context = await browser.newContext({
       viewport: { width: CAPTURE_SIZE + 40, height: CAPTURE_SIZE + 40 },
@@ -556,7 +621,7 @@ async function main(): Promise<void> {
         // Remounts the character; resolves from its onReady (frame on canvas).
         await page.evaluate(
           ({ state, t, from, audio }) =>
-            window.__fillyFrame({ state, t, from, audioLevel: audio ?? null, blink: false }),
+            window.__fillyFrame({ state, t, from, audioLevel: audio ?? null, blink: false, pose: null }),
           { state: plan.state, t, from: plan.from, audio: plan.audio },
         );
         await page.waitForTimeout(50);
@@ -564,6 +629,19 @@ async function main(): Promise<void> {
       }
       captured.set(plan.state, frames);
       console.log(`captured ${plan.state}`);
+    }
+    // Extra sheet cells with pose values the animator has no state for.
+    for (const sheet of sheets) {
+      for (const cell of sheet.cells) {
+        if (!("pose" in cell)) continue;
+        await page.evaluate(
+          ({ state, t, pose }) => window.__fillyFrame({ state, t, audioLevel: null, blink: false, pose }),
+          { state: cell.state, t: cell.t, pose: cell.pose },
+        );
+        await page.waitForTimeout(50);
+        posed.set(cell, decodePng(await page.locator("[data-ready='1']").first().screenshot({ omitBackground: true })));
+        console.log(`captured ${cell.state} with pose ${JSON.stringify(cell.pose)}`);
+      }
     }
     await context.close();
   } finally {
@@ -626,21 +704,21 @@ async function main(): Promise<void> {
     console.log(path.join(outDir, "manifest.json"));
   }
 
-  // Flappy sheet: small cells at their own scale, one PNG8 the game keeps in RAM.
-  if (targets.has("flappy")) {
-    const flappyScale = FLAPPY.body / (idleBounds.y1 - idleBounds.y0);
-    const happy = captured.get("happy")!;
-    const surprised = captured.get("surprised")!;
-    const loopStart = timings.get("happy")!.loopStart;
-    const loopLength = happy.length - loopStart;
-    const picks = [...FLAPPY.flap.map((i) => happy[loopStart + (i % loopLength)]), surprised[surprised.length - 1]];
-    const sheet = encodePng8(packRow(picks.map((frame) => flappyCell(frame, flappyScale, FLAPPY.cell))));
-    const file = path.join(appsDir, FLAPPY.app, FLAPPY.file);
+  // Game sheets: small cells at their own scale, one PNG8 the game keeps in RAM.
+  for (const sheet of sheets) {
+    const sheetScale = sheet.body / (idleBounds.y1 - idleBounds.y0);
+    const pick = (cell: SheetCell): Rgba => {
+      if ("pose" in cell) return posed.get(cell)!;
+      const frames = captured.get(cell.state)!;
+      if ("last" in cell) return frames[frames.length - 1];
+      const loopStart = timings.get(cell.state)!.loopStart;
+      return frames[loopStart + (cell.loop % (frames.length - loopStart))];
+    };
+    const png = encodePng8(packRow(sheet.cells.map((cell) => sheetCell(pick(cell), sheetScale, sheet.cell, sheet.align, anchor))));
+    const file = path.join(appsDir, sheet.app, sheet.file);
     await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, sheet);
-    console.log(
-      `${file}: ${picks.length} cells of ${FLAPPY.cell}×${FLAPPY.cell} px (happy loop #${loopStart}+${FLAPPY.flap.join(",")}), ${(sheet.length / 1024).toFixed(1)} kB`,
-    );
+    await fs.writeFile(file, png);
+    console.log(`${file}: ${sheet.cells.length} cells of ${sheet.cell}×${sheet.cell} px, ${(png.length / 1024).toFixed(1)} kB`);
   }
 
   // Menu icons: one frame each, cropped to that frame, soft alpha, RGBA like the badge's own icons.

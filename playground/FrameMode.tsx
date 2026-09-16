@@ -3,12 +3,14 @@
  * the frame's transition in that state.
  *
  * Scripts can re-target the frame without a reload through
- * `window.__fillyFrame({ state, t, from, audioLevel, blink })`. The character
- * is remounted for each request and the promise resolves from its `onReady`,
- * i.e. once the new frame is on the canvas (used by scripts/export-badger.mts).
+ * `window.__fillyFrame({ state, t, from, audioLevel, blink, pose })`. The
+ * character is remounted for each request and the promise resolves from its
+ * `onReady`, i.e. once the new frame is on the canvas (used by
+ * scripts/export-badger.mts). `pose` values replace the animator's values in
+ * the frame, for sprites of poses the animator has no state for.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FillyState } from "../src/core/types";
+import type { FillyPose, FillyState } from "../src/core/types";
 import { FillyCharacter } from "../src/react/FillyCharacter";
 
 export interface FrameModeProps {
@@ -18,6 +20,7 @@ export interface FrameModeProps {
   audioLevel: number | null;
   blink: boolean;
   from?: FillyState;
+  pose?: Partial<FillyPose> | null;
 }
 
 export type FrameRequest = Partial<Omit<FrameModeProps, "size">>;
@@ -60,6 +63,7 @@ export function FrameMode(initial: FrameModeProps) {
         freezeAt={frame.t}
         freezeBlink={frame.blink}
         freezeFrom={frame.from}
+        freezePose={frame.pose ?? undefined}
         audioLevel={frame.audioLevel}
         followPointer={false}
         interactive={false}

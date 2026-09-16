@@ -8,7 +8,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { FillyAnimator } from "../animation/FillyAnimator";
-import type { FillyState } from "../core/types";
+import type { FillyPose, FillyState } from "../core/types";
 import { FillyModel } from "../model/FillyModel";
 
 /** Where the camera looks (slightly below the body centre so the feet/shadow read). */
@@ -35,6 +35,11 @@ export interface FillyFreeze {
    * transition from the animator's initial state (transition frames, enter impulses).
    */
   enter?: FillyState;
+  /**
+   * Pose values that replace the animator's values in the frozen frame (for
+   * example a squashed body for a sprite the animator has no state for).
+   */
+  pose?: Partial<FillyPose>;
 }
 
 export interface FillyScenePropsInternal {
@@ -125,6 +130,9 @@ export function FillyScene({
   const freezeEnter = freeze?.enter;
   const freezeBlink = freeze?.blink ?? false;
   const freezeAudio = freeze?.audioLevel;
+  const freezePose = freeze?.pose;
+  const posed = (): FillyPose =>
+    freezePose ? { ...animator.pose, ...freezePose } : animator.pose;
   useEffect(() => {
     if (freezeAt === undefined) return;
     animator.reset();
@@ -132,16 +140,16 @@ export function FillyScene({
     if (freezeAudio !== undefined) animator.setAudioLevel(freezeAudio);
     if (freezeBlink) animator.blink();
     animator.stepTo(freezeAt);
-    modelRef.current?.applyPose(animator.pose, animator.time);
+    modelRef.current?.applyPose(posed(), animator.time);
     invalidate();
-  }, [animator, freezeAt, freezeEnter, freezeBlink, freezeAudio, invalidate]);
+  }, [animator, freezeAt, freezeEnter, freezeBlink, freezeAudio, freezePose, invalidate]);
 
   const frozen = freezeAt !== undefined;
   useFrame((_state, dt) => {
     const model = modelRef.current;
     if (!model) return;
     if (!frozen && running) animator.update(dt);
-    model.applyPose(animator.pose, animator.time);
+    model.applyPose(frozen ? posed() : animator.pose, animator.time);
     if (!readyRef.current) {
       readyRef.current = true;
       // The frame is rendered synchronously after this callback; notify on the next tick.
