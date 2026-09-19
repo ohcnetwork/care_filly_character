@@ -33,6 +33,24 @@ const smoothstep = (e0: number, e1: number, x: number): number => {
   return t * t * (3 - 2 * t);
 };
 
+/** Small flat spiral, used for the dizzy-eye swirl (a white line coiling
+ *  inward). Built directly as a thin tube so it needs no shared geometry. */
+function spiralGeometry(turns: number, rStart: number, rEnd: number): THREE.TubeGeometry {
+  const segments = 28;
+  const curve = new THREE.CurvePath<THREE.Vector3>();
+  let prev: THREE.Vector3 | null = null;
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const a = t * Math.PI * 2 * turns;
+    const r = rStart + (rEnd - rStart) * t;
+    const point = new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0);
+    if (prev) curve.add(new THREE.LineCurve3(prev, point));
+    prev = point;
+  }
+  // Thick stroke so the spiral still reads clearly at small (FAB-sized) renders.
+  return new THREE.TubeGeometry(curve, segments, 0.013, 5, false);
+}
+
 // ── eyes ────────────────────────────────────────────────────────────────────
 
 /** Eye layout, measured against the supplied character sheet. */
@@ -134,6 +152,8 @@ export interface EyeRig {
   highlights: [THREE.Mesh, THREE.Mesh, THREE.Mesh, THREE.Mesh];
   arc: THREE.Mesh;
   arcMaterial: THREE.MeshStandardMaterial;
+  spiral: THREE.Mesh;
+  spiralMaterial: THREE.MeshBasicMaterial;
   brow: THREE.Mesh;
   browBaseY: number;
   side: -1 | 1;
@@ -164,6 +184,7 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   sclera.scale.set(0.139, 0.164, 0.004);
   sclera.position.set(-0.001, 0, 0.003);
   sclera.visible = illustrated;
+  sclera.userData.baseVisible = illustrated;
   lid.add(sclera);
 
   const ball = new THREE.Mesh(illustrated ? unit : getCartoonEyeGeometry(side), materials.eye);
@@ -176,21 +197,25 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   big.name = "highlightBig";
   big.scale.set(0.04, 0.045, 0.0008);
   big.position.set(-0.041, 0.059, 0.012);
+  big.userData.baseVisible = true;
   const lower = new THREE.Mesh(unit, materials.eyeHighlightSoft);
   lower.name = "highlightLower";
   lower.scale.set(0.024, 0.017, 0.0006);
   lower.position.set(0.04, -0.088, 0.012);
   lower.visible = illustrated;
+  lower.userData.baseVisible = illustrated;
   const pin = new THREE.Mesh(unit, materials.eyeHighlight);
   pin.name = "highlightPin";
   pin.scale.set(0.008, 0.008, 0.0005);
   pin.position.set(0.031, 0.025, 0.013);
   pin.visible = illustrated;
+  pin.userData.baseVisible = illustrated;
   const soft = new THREE.Mesh(unit, materials.eyeHighlightSoft);
   soft.name = "highlightSoft";
   soft.scale.set(0.022, 0.013, 0.0006);
   soft.position.set(-0.022, -0.12, 0.011);
   soft.visible = false;
+  soft.userData.baseVisible = false;
   lid.add(big, lower, pin, soft);
 
   const arcMaterial = materials.eyeLid.clone();
@@ -202,6 +227,18 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
   arc.scale.z = 0.25;
   arc.visible = false;
   group.add(arc);
+
+  const spiralMaterial = materials.eyeHighlight.clone();
+  spiralMaterial.color.set(PALETTE.eyeLid);
+  spiralMaterial.transparent = true;
+  spiralMaterial.opacity = 0;
+  spiralMaterial.depthTest = false;
+  const spiral = new THREE.Mesh(spiralGeometry(1.6, 0.029, 0.138), spiralMaterial);
+  spiral.name = "dizzySpiral";
+  spiral.position.set(0.009, 0, 0.016);
+  spiral.renderOrder = 1;
+  spiral.visible = false;
+  lid.add(spiral);
 
   const brow = new THREE.Mesh(getBrowGeometry(), materials.brow);
   brow.name = "brow";
@@ -216,7 +253,7 @@ export function buildEye(side: -1 | 1, materials: FillyMaterials): EyeRig {
 
   return {
     group, lid, sclera, ball, highlights: [big, lower, pin, soft],
-    arc, arcMaterial, brow, browBaseY: brow.position.y, side,
+    arc, arcMaterial, spiral, spiralMaterial, brow, browBaseY: brow.position.y, side,
   };
 }
 
@@ -230,6 +267,7 @@ export function applyEyePose(
   scale: number,
   white: number,
   brow: number,
+  dizzy = 0,
 ): void {
   const openness = clamp(open, 0, 1);
   const whiteMix = clamp(white, 0, 1);
@@ -260,6 +298,16 @@ export function applyEyePose(
   pin.position.set(0.031 + gx, 0.025 + gy, 0.013);
   soft.position.set(-0.022 + gx, -0.12 + gy, 0.011);
 
+  // The dizzy spiral replaces the eye while it's clearly visible; the ball
+  // returns well before the spiral fully fades (its spring decays slowly),
+  // so leaving "dizzy" crossfades instead of leaving the eye briefly blank.
+  const hideForSpiral = dizzy > 0.5;
+  eye.ball.visible = !hideForSpiral;
+  eye.sclera.visible = (eye.sclera.userData.baseVisible as boolean) && !hideForSpiral;
+  for (const highlight of eye.highlights) {
+    highlight.visible = (highlight.userData.baseVisible as boolean) && !hideForSpiral;
+  }
+
   let arcScale = clamp(arc, -1, 1);
   if (Math.abs(arcScale) < 0.15) arcScale = arcScale < 0 ? -0.15 : 0.15;
   eye.arc.scale.y = arcScale;
@@ -270,6 +318,13 @@ export function applyEyePose(
 
   eye.brow.rotation.z = eye.side * clamp(brow, -1, 1) * EYE.browTilt;
   eye.brow.position.y = eye.browBaseY + EYE.browLift * Math.max(0, scale - 1);
+
+  const spin = clamp(dizzy, 0, 1);
+  eye.spiral.visible = spin > 0.02;
+  eye.spiralMaterial.opacity = spin;
+  // Riding on the same eyeLook angle that already orbits during "dizzy"
+  // keeps the swirl in lock-step with the pupil, just spinning faster.
+  eye.spiral.rotation.z = Math.atan2(lookY, lookX) * 2.4;
 }
 
 // ── cheeks ──────────────────────────────────────────────────────────────────
@@ -302,7 +357,7 @@ export function placeOnBody(
 }
 
 /** Attach a facial feature to the insert, following its local tangent. */
-function placeOnPlate(obj: THREE.Object3D, x: number, y: number, offset: number): void {
+export function placeOnPlate(obj: THREE.Object3D, x: number, y: number, offset: number): void {
   const step = 0.002;
   const dzdx = (plateZ(x + step, y) - plateZ(x - step, y)) / (2 * step);
   const dzdy = (plateZ(x, y + step) - plateZ(x, y - step)) / (2 * step);

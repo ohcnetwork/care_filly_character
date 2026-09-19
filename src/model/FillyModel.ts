@@ -25,6 +25,7 @@ import {
 import { getBodyGeometry, getPlateSurfaceGeometry } from "./geometry";
 import {
   FEET_BOTTOM,
+  FOOT,
   applyArmPose,
   applyEarPose,
   buildArm,
@@ -183,8 +184,10 @@ export class FillyModel extends THREE.Group {
 
     // Cartoon ink eyes by default. The optional iris only touches materials
     // owned by this model; caller-supplied maps retain their own lifecycle.
-    this.eyeTexture = opts.irisTexture === true && this.ownsMaterials.has(mats.eye)
-      ? ensureEyeTexture(mats) : null;
+    this.eyeTexture =
+      opts.irisTexture === true && this.ownsMaterials.has(mats.eye)
+        ? ensureEyeTexture(mats)
+        : null;
     this.eyeL = buildEye(-1, mats);
     this.eyeR = buildEye(1, mats);
     const cheekL = buildCheek(-1, mats);
@@ -201,8 +204,18 @@ export class FillyModel extends THREE.Group {
 
     // The pads and hands cast a soft seam onto the shell, grounding the
     // separate pieces as a single sculpted toy under the studio key light.
-    for (const part of [body, plateSurface, sideL, sideR, footL, footR,
-      this.earL.tile, this.earR.tile, this.armL.hand, this.armR.hand]) {
+    for (const part of [
+      body,
+      plateSurface,
+      sideL,
+      sideR,
+      footL,
+      footR,
+      this.earL.tile,
+      this.earR.tile,
+      this.armL.hand,
+      this.armR.hand,
+    ]) {
       part.castShadow = true;
       part.receiveShadow = true;
     }
@@ -279,10 +292,23 @@ export class FillyModel extends THREE.Group {
     );
     applyArmPose(this.armR, clampKey("armR", pose.armR), 0);
 
+    // Mid-step, a foot lifts and splays out to the side, then plants back
+    // down — a side-shuffle rather than a forward stride (this is a
+    // front-facing mascot, so a sideways gait reads far more naturally).
+    const footLiftL = clampKey("footL", pose.footL);
+    const footLiftR = clampKey("footR", pose.footR);
+    parts.footL.position.y = FOOT.y + 0.09 * footLiftL;
+    parts.footL.position.x = -FOOT.x - 0.06 * footLiftL;
+    parts.footL.rotation.z = -FOOT.tilt - 0.3 * footLiftL;
+    parts.footR.position.y = FOOT.y + 0.09 * footLiftR;
+    parts.footR.position.x = FOOT.x + 0.06 * footLiftR;
+    parts.footR.rotation.z = FOOT.tilt + 0.3 * footLiftR;
+
     const arc = clampKey("eyeArc", pose.eyeArc);
     const lookX = clampKey("eyeLookX", pose.eyeLookX);
     const lookY = clampKey("eyeLookY", pose.eyeLookY);
     const eyeScale = clampKey("eyeScale", pose.eyeScale);
+    const dizzy = clampKey("swirl", pose.swirl);
     applyEyePose(
       this.eyeL,
       clampKey("eyeOpenL", pose.eyeOpenL),
@@ -292,6 +318,7 @@ export class FillyModel extends THREE.Group {
       eyeScale,
       clampKey("eyeWhite", pose.eyeWhite),
       clampKey("browL", pose.browL),
+      dizzy,
     );
     applyEyePose(
       this.eyeR,
@@ -302,6 +329,7 @@ export class FillyModel extends THREE.Group {
       eyeScale,
       clampKey("eyeWhite", pose.eyeWhite),
       clampKey("browR", pose.browR),
+      dizzy,
     );
 
     // Legacy pose values must not reveal the removed blush in any expression.
@@ -319,6 +347,7 @@ export class FillyModel extends THREE.Group {
       clampKey("bubbles", pose.bubbles),
       clampKey("waves", pose.waves),
       clampKey("sparks", pose.sparks),
+      clampKey("swirl", pose.swirl),
       time,
       pose.mouthRound < 0.65 && pose.sparks > 0 && pose.mouthOpen > 0.1,
     );

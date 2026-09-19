@@ -93,6 +93,8 @@ export class FillyAnimator {
       thinking: 0,
       surprised: 0,
       sleepy: 0,
+      dizzy: 0,
+      walking: 0,
     };
     this.springs = POSE_KEYS.map(
       (k) => new Spring(STATE_TARGETS[this._state][k], POSE_SPRING_CONFIG[k]),

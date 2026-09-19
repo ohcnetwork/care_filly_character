@@ -68,6 +68,9 @@ export const POSE_SPRING_CONFIG: Readonly<Record<PoseKey, SpringConfig>> =
     bubbles: SPRING_PRESETS.slow,
     waves: SPRING_PRESETS.slow,
     sparks: SPRING_PRESETS.slow,
+    swirl: SPRING_PRESETS.slow,
+    footL: SPRING_PRESETS.fast,
+    footR: SPRING_PRESETS.fast,
   });
 
 /**

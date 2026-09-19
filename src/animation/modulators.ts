@@ -192,6 +192,35 @@ export class StateModulator {
         pose.bodyRoll += 0.02 * Math.sin(TAU * 0.1 * T) * w;
         break;
       }
+      case "dizzy": {
+        // Eyes trace a circle (the classic "seeing stars" spin); the body
+        // only sways gently underneath so the spin stays the focal point.
+        const spin = TAU * 1.2 * t;
+        pose.eyeLookX += 0.55 * Math.cos(spin) * w;
+        pose.eyeLookY += 0.4 * Math.sin(spin) * w;
+        pose.bodyRoll += 0.03 * Math.sin(TAU * 0.5 * T) * w;
+        pose.bodyYaw += 0.015 * Math.cos(TAU * 0.4 * T) * w;
+        break;
+      }
+      case "walking": {
+        // One full left-right stride every WALK_PERIOD seconds. Free-running
+        // (T, not t) since the gait should never reset mid-stride. Kept slow
+        // and gentle so it reads as an unhurried walk, not a run.
+        const WALK_PERIOD = 1.0;
+        const cycle = TAU * (T / WALK_PERIOD);
+        const bounce = Math.abs(Math.sin(cycle)); // a little hop each step
+        pose.bodyY += 0.028 * bounce * w;
+        pose.bodyScaleY += (0.012 - 0.025 * bounce) * w;
+        pose.bodyScaleX += 0.018 * bounce * w;
+        pose.bodyRoll += 0.07 * Math.sin(cycle) * w; // gentle side-to-side waddle
+        pose.bodyYaw += 0.025 * Math.sin(cycle * 0.5) * w;
+        pose.armL += 0.32 * Math.sin(cycle + Math.PI) * w;
+        pose.armR += 0.32 * Math.sin(cycle) * w;
+        pose.footL += Math.max(0, Math.sin(cycle)) * w;
+        pose.footR += Math.max(0, Math.sin(cycle + Math.PI)) * w;
+        pose.mouthWide += 0.02 * bounce * w;
+        break;
+      }
     }
   }
 }

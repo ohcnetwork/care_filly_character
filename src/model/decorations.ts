@@ -27,16 +27,27 @@ class ArcCurve extends THREE.Curve<THREE.Vector3> {
 }
 
 /** Convert a drawn two-dimensional path to a thin tube, including its corners. */
-function outlineGeometry(path: THREE.Path, radius = STROKE_RADIUS): THREE.TubeGeometry {
+function outlineGeometry(
+  path: THREE.Path,
+  radius = STROKE_RADIUS,
+): THREE.TubeGeometry {
   const points = path.getPoints(18);
   const curve = new THREE.CurvePath<THREE.Vector3>();
   for (let i = 1; i < points.length; i++) {
-    curve.add(new THREE.LineCurve3(
-      new THREE.Vector3(points[i - 1].x, points[i - 1].y, 0),
-      new THREE.Vector3(points[i].x, points[i].y, 0),
-    ));
+    curve.add(
+      new THREE.LineCurve3(
+        new THREE.Vector3(points[i - 1].x, points[i - 1].y, 0),
+        new THREE.Vector3(points[i].x, points[i].y, 0),
+      ),
+    );
   }
-  return new THREE.TubeGeometry(curve, Math.max(24, points.length * 2), radius, 6, false);
+  return new THREE.TubeGeometry(
+    curve,
+    Math.max(24, points.length * 2),
+    radius,
+    6,
+    false,
+  );
 }
 
 /** Compact, gently asymmetric thought-cloud outline. */
@@ -79,7 +90,8 @@ function heartGeometry(): THREE.ShapeGeometry {
 }
 
 function setOpacity(meshes: readonly THREE.Mesh[], opacity: number): void {
-  for (const mesh of meshes) (mesh.material as THREE.Material).opacity = opacity;
+  for (const mesh of meshes)
+    (mesh.material as THREE.Material).opacity = opacity;
 }
 
 /** Expression families keep their existing public names and controls. */
@@ -89,12 +101,14 @@ export class FillyDecorations {
   readonly bubbles: THREE.Mesh[] = [];
   readonly waves: THREE.Mesh[] = [];
   readonly sparks: THREE.Mesh[] = [];
+  readonly swirl: THREE.Mesh[] = [];
   private readonly speech: THREE.Mesh[] = [];
   private readonly zGroup = new THREE.Group();
   private readonly bubbleGroup = new THREE.Group();
   private readonly waveGroup = new THREE.Group();
   private readonly sparkGroup = new THREE.Group();
   private readonly speechGroup = new THREE.Group();
+  private readonly swirlGroup = new THREE.Group();
   private readonly owned: Array<{ dispose(): void }> = [];
 
   constructor(materials: FillyMaterials) {
@@ -104,13 +118,22 @@ export class FillyDecorations {
     this.waveGroup.name = "waves";
     this.sparkGroup.name = "sparks";
     this.speechGroup.name = "speech";
-    this.group.add(this.zGroup, this.bubbleGroup, this.waveGroup, this.sparkGroup, this.speechGroup);
+    this.swirlGroup.name = "swirl";
+    this.group.add(
+      this.zGroup,
+      this.bubbleGroup,
+      this.waveGroup,
+      this.sparkGroup,
+      this.speechGroup,
+      this.swirlGroup,
+    );
     this.buildZzz(materials);
     this.buildBubbles(materials);
     this.buildWaves(materials);
     this.buildSparks(materials);
     this.buildSpeech(materials);
-    this.update(0, 0, 0, 0, 0);
+    this.buildSwirl(materials);
+    this.update(0, 0, 0, 0, 0, 0);
   }
 
   private cloneAccent(materials: FillyMaterials): THREE.MeshBasicMaterial {
@@ -151,7 +174,13 @@ export class FillyDecorations {
       path.lineTo(width / 2, height / 2);
       path.lineTo(-width / 2, -height / 2);
       path.lineTo(width / 2, -height / 2);
-      this.addMesh(outlineGeometry(path, 0.006), materials, this.zGroup, this.zzz, `z${i}`);
+      this.addMesh(
+        outlineGeometry(path, 0.006),
+        materials,
+        this.zGroup,
+        this.zzz,
+        `z${i}`,
+      );
     }
   }
 
@@ -164,25 +193,74 @@ export class FillyDecorations {
       const { x, y, r } = trails[i];
       this.addMesh(
         new THREE.TorusGeometry(r, 0.0045, 6, 32),
-        materials, this.bubbleGroup, this.bubbles, `bubble${i}`, x, y,
+        materials,
+        this.bubbleGroup,
+        this.bubbles,
+        `bubble${i}`,
+        x,
+        y,
       );
     }
-    this.addMesh(outlineGeometry(thoughtCloudPath()), materials, this.bubbleGroup, this.bubbles, "thoughtCloud", 0.86, 0.815);
-    this.addMesh(heartGeometry(), materials, this.bubbleGroup, this.bubbles, "thoughtHeart", 0.862, 0.837);
+    this.addMesh(
+      outlineGeometry(thoughtCloudPath()),
+      materials,
+      this.bubbleGroup,
+      this.bubbles,
+      "thoughtCloud",
+      0.86,
+      0.815,
+    );
+    this.addMesh(
+      heartGeometry(),
+      materials,
+      this.bubbleGroup,
+      this.bubbles,
+      "thoughtHeart",
+      0.862,
+      0.837,
+    );
   }
 
   private buildSpeech(materials: FillyMaterials): void {
-    this.addMesh(outlineGeometry(speechBubblePath()), materials, this.speechGroup, this.speech, "speechBubble", 0.865, 0.797);
-    this.addMesh(heartGeometry(), materials, this.speechGroup, this.speech, "speechHeart", 0.876, 0.828);
+    this.addMesh(
+      outlineGeometry(speechBubblePath()),
+      materials,
+      this.speechGroup,
+      this.speech,
+      "speechBubble",
+      0.865,
+      0.797,
+    );
+    this.addMesh(
+      heartGeometry(),
+      materials,
+      this.speechGroup,
+      this.speech,
+      "speechHeart",
+      0.876,
+      0.828,
+    );
   }
 
   private buildWaves(materials: FillyMaterials): void {
     const radii = [0.072, 0.126, 0.18];
     for (let i = 0; i < radii.length; i++) {
       const geometry = new THREE.TubeGeometry(
-        new ArcCurve(radii[i], -0.72, 0.76), 24, STROKE_RADIUS, 6, false,
+        new ArcCurve(radii[i], -0.72, 0.76),
+        24,
+        STROKE_RADIUS,
+        6,
+        false,
       );
-      this.addMesh(geometry, materials, this.waveGroup, this.waves, `wave${i}`, 0.855, 0.635);
+      this.addMesh(
+        geometry,
+        materials,
+        this.waveGroup,
+        this.waves,
+        `wave${i}`,
+        0.855,
+        0.635,
+      );
     }
   }
 
@@ -197,8 +275,74 @@ export class FillyDecorations {
       const path = new THREE.Path();
       path.moveTo(x0, y0);
       path.lineTo(x1, y1);
-      this.addMesh(outlineGeometry(path), materials, this.sparkGroup, this.sparks, `spark${i}`);
+      this.addMesh(
+        outlineGeometry(path),
+        materials,
+        this.sparkGroup,
+        this.sparks,
+        `spark${i}`,
+      );
     }
+  }
+
+  /** A small four-point star (two crossed diamonds), for the swirl's ends. */
+  private starShape(r: number): THREE.Shape {
+    const shape = new THREE.Shape();
+    const spikes = 4;
+    for (let i = 0; i <= spikes * 2; i++) {
+      const radius = i % 2 === 0 ? r : r * 0.4;
+      const a = (Math.PI * i) / spikes;
+      const x = Math.sin(a) * radius;
+      const y = Math.cos(a) * radius;
+      if (i === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    }
+    shape.closePath();
+    return shape;
+  }
+
+  /** Dizzy accent: a loop-the-loop trail with a star at each open end,
+   *  orbiting above the head. Rotation (not just opacity) is animated. */
+  private buildSwirl(materials: FillyMaterials): void {
+    const loop = new THREE.Path();
+    const turns = 1.35;
+    const points = 40;
+    for (let i = 0; i <= points; i++) {
+      const t = i / points;
+      const a = t * Math.PI * 2 * turns;
+      const r = 0.045 + 0.075 * t;
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      if (i === 0) loop.moveTo(x, y);
+      else loop.lineTo(x, y);
+    }
+    this.addMesh(
+      outlineGeometry(loop, 0.005),
+      materials,
+      this.swirlGroup,
+      this.swirl,
+      "swirlLoop",
+      -0.93,
+      0.86,
+    );
+    this.addMesh(
+      new THREE.ShapeGeometry(this.starShape(0.028), 8),
+      materials,
+      this.swirlGroup,
+      this.swirl,
+      "swirlStarInner",
+      -0.93,
+      0.86,
+    );
+    this.addMesh(
+      new THREE.ShapeGeometry(this.starShape(0.034), 8),
+      materials,
+      this.swirlGroup,
+      this.swirl,
+      "swirlStarOuter",
+      -0.855,
+      0.935,
+    );
   }
 
   /** Set master opacities and add restrained motion without shifting framing. */
@@ -207,6 +351,7 @@ export class FillyDecorations {
     bubbles: number,
     waves: number,
     sparks: number,
+    swirl: number,
     time: number,
     speaking = false,
   ): void {
@@ -216,7 +361,11 @@ export class FillyDecorations {
       for (let i = 0; i < this.zzz.length; i++) {
         const mesh = this.zzz[i];
         const drift = Math.sin(time * 1.3 + i * 0.9);
-        mesh.position.set(0.792 + i * 0.145, 0.797 + i * 0.137 + drift * 0.01, ACCENT_Z);
+        mesh.position.set(
+          0.792 + i * 0.145,
+          0.797 + i * 0.137 + drift * 0.01,
+          ACCENT_Z,
+        );
         (mesh.material as THREE.Material).opacity = z * (0.88 + 0.12 * drift);
       }
     }
@@ -248,6 +397,17 @@ export class FillyDecorations {
       // Talking uses a softer source pose value; the bubble should still be
       // as legible as the other outline accents when that state is settled.
       setOpacity(this.speech, clamp01(s * 1.8));
+    }
+
+    const sw = clamp01(swirl);
+    this.swirlGroup.visible = sw > 0.001;
+    if (this.swirlGroup.visible) {
+      setOpacity(this.swirl, sw);
+      // The loop spins one way, the two stars drift the other, so the whole
+      // accent reads as "orbiting" rather than one rigid rotating sticker.
+      this.swirl[0].rotation.z = time * 2.4;
+      this.swirl[1].rotation.z = -time * 1.6;
+      this.swirl[2].rotation.z = -time * 1.6;
     }
   }
 

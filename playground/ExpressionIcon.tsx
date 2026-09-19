@@ -3,6 +3,7 @@ import {
   Cloud,
   Heart,
   Moon,
+  PersonSimpleWalk,
   Sparkle,
   Star,
   WarningCircle,
@@ -21,9 +22,14 @@ const EXPRESSION_ICONS: Record<SheetFrame["id"], Icon> = {
   thinking: Cloud,
   surprised: WarningCircle,
   sleepy: Moon,
+  dizzy: Sparkle,
+  walking: PersonSimpleWalk,
 };
 
-export function ExpressionIcon({ expression, ...props }: IconProps & { expression: SheetFrame["id"] }) {
+export function ExpressionIcon({
+  expression,
+  ...props
+}: IconProps & { expression: SheetFrame["id"] }) {
   const IconComponent = EXPRESSION_ICONS[expression];
   return <IconComponent aria-hidden="true" {...props} />;
 }

@@ -103,6 +103,24 @@ const SURPRISED: Readonly<FillyPose> = Object.freeze({
   bodyPitch: -0.05,
 });
 
+/** Woozy, just-spun-around look: flat dazed eyes, small "o" mouth, drooped
+ *  ears, and a spinning loop-the-loop with two stars overhead. */
+const DIZZY: Readonly<FillyPose> = Object.freeze({
+  ...DEFAULT_POSE,
+  eyeArc: 0,
+  eyeScale: 0.95,
+  mouthOpen: 0.3,
+  mouthRound: 1,
+  mouthWide: 0.7,
+  mouthSmile: -0.1,
+  browL: -0.4,
+  browR: -0.4,
+  earL: -0.08,
+  earR: -0.08,
+  bodyPitch: 0.02,
+  swirl: 1,
+});
+
 const SLEEPY: Readonly<FillyPose> = Object.freeze({
   ...DEFAULT_POSE,
   eyeOpenL: 0,
@@ -126,6 +144,20 @@ const SLEEPY: Readonly<FillyPose> = Object.freeze({
   cheek: 0.4,
 });
 
+/** Purposeful little waddle: forward lean, determined smile, arms and feet
+ *  left near neutral — the overlay drives the actual gait (bounce, arm
+ *  swing, foot lift, side-to-side roll). */
+const WALKING: Readonly<FillyPose> = Object.freeze({
+  ...DEFAULT_POSE,
+  bodyPitch: 0.05,
+  mouthOpen: 0.08,
+  mouthSmile: 0.85,
+  mouthWide: 1.05,
+  earL: 0.1,
+  earR: 0.1,
+  cheek: 0.6,
+});
+
 /** Static target pose for every state. */
 export const STATE_TARGETS: Readonly<Record<FillyState, Readonly<FillyPose>>> =
   Object.freeze({
@@ -136,6 +168,8 @@ export const STATE_TARGETS: Readonly<Record<FillyState, Readonly<FillyPose>>> =
     thinking: THINKING,
     surprised: SURPRISED,
     sleepy: SLEEPY,
+    dizzy: DIZZY,
+    walking: WALKING,
   });
 
 /** Per-state multiplier applied to pointer follow (0 = disabled). */
@@ -148,6 +182,8 @@ export const POINTER_FOLLOW_WEIGHT: Readonly<Record<FillyState, number>> =
     thinking: 0.5,
     surprised: 0.4,
     sleepy: 0,
+    dizzy: 0,
+    walking: 0.15,
   });
 
 /** True when the state's eyes are nominally open (blink overlay applies). */
