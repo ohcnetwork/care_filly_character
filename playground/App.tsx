@@ -1,7 +1,7 @@
 /**
  * Playground router. Modes (by URL query):
  *  - default            interactive page (state buttons, audio slider, mic, pointer follow)
- *  - ?state=X&t=S       deterministic static frame (freezeAt) — [&size=360][&audio=0.5][&blink=1]
+ *  - ?state=X&t=S       deterministic static frame (freezeAt) — [&size=360][&audio=0.5][&blink=1][&from=idle]
  *  - ?sheet=1           all 8 sheet frames in a 4×2 grid (compare with the reference)
  *  - ?export=1          exposes window.__fillyExportGLB() for scripts/export-glb.mts
  */
@@ -29,6 +29,7 @@ export function App() {
     const blink = stateParam === "blink" || params.get("blink") === "1";
     const state = isFillyState(stateParam) ? stateParam : "idle";
     const audio = params.get("audio");
+    const from = params.get("from");
     return (
       <FrameMode
         state={state}
@@ -36,6 +37,7 @@ export function App() {
         size={num(params.get("size"), 360)}
         audioLevel={audio === null ? null : num(audio, 0)}
         blink={blink}
+        from={isFillyState(from) ? from : undefined}
       />
     );
   }

@@ -17,7 +17,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { FillyAnimator } from "../animation/FillyAnimator";
-import type { FillyState } from "../core/types";
+import type { FillyPose, FillyState } from "../core/types";
 import { useOnScreen, usePointerFollow } from "./hooks";
 import {
   CAMERA_FOV,
@@ -60,6 +60,16 @@ export interface FillyCharacterProps {
   freezeAt?: number;
   /** With `freezeAt`: trigger a blink at t = 0 so the frame lands mid-blink. */
   freezeBlink?: boolean;
+  /**
+   * With `freezeAt`: start in this state and switch to `state` at t = 0, so the
+   * frame lies on the transition (spring ease-in, enter impulse).
+   */
+  freezeFrom?: FillyState;
+  /**
+   * With `freezeAt`: pose values that replace the animator's values in the
+   * frame (for sprites of poses the animator has no state for).
+   */
+  freezePose?: Partial<FillyPose>;
   /** Device pixel ratio or [min, max] range (default [1, 2]). */
   dpr?: number | [number, number];
   /** CSS background of the canvas (default transparent). */
@@ -101,6 +111,8 @@ export const FillyCharacter = forwardRef<
     paused = false,
     freezeAt,
     freezeBlink = false,
+    freezeFrom,
+    freezePose,
     dpr = [1, 2],
     background = "transparent",
     onReady,
@@ -113,18 +125,20 @@ export const FillyCharacter = forwardRef<
 
   // One animator per seed. It starts in the state current at creation time (so
   // a runtime `seed` change doesn't replay an enter impulse from the mount
-  // state); in freeze mode it is rebuilt per state so `reset()` lands on it.
+  // state); in freeze mode it is rebuilt per state so `reset()` lands on it
+  // (or on `freezeFrom`, from which the freeze effect then enters `state`).
   const frozen = freezeAt !== undefined;
   const latestStateRef = useRef(state);
   latestStateRef.current = state;
   const frozenState = frozen ? state : null;
+  const frozenFrom = frozen ? (freezeFrom ?? null) : null;
   const animator = useMemo(
     () =>
       new FillyAnimator({
         seed,
-        initialState: frozenState ?? latestStateRef.current,
+        initialState: frozenFrom ?? frozenState ?? latestStateRef.current,
       }),
-    [seed, frozenState],
+    [seed, frozenState, frozenFrom],
   );
 
   // Prop → animator state (unless a click-triggered happy burst is running).
@@ -225,8 +239,16 @@ export const FillyCharacter = forwardRef<
 
   const freeze = useMemo<FillyFreeze | undefined>(
     () =>
-      frozen ? { at: freezeAt, blink: freezeBlink, audioLevel } : undefined,
-    [frozen, freezeAt, freezeBlink, audioLevel],
+      frozen
+        ? {
+            at: freezeAt,
+            blink: freezeBlink,
+            audioLevel,
+            enter: frozenFrom !== null && frozenFrom !== state ? state : undefined,
+            pose: freezePose,
+          }
+        : undefined,
+    [frozen, freezeAt, freezeBlink, audioLevel, frozenFrom, state, freezePose],
   );
 
   const css = toCssSize(size);

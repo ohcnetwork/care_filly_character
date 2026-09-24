@@ -1,0 +1,85 @@
+{
+  "scale": 0.21114,
+  "body": {
+    "w": 71,
+    "h": 72
+  },
+  "extent": {
+    "left": 45,
+    "right": 45,
+    "up": 85,
+    "down": 4
+  },
+  "states": {
+    "idle": {
+      "dir": "idle",
+      "frames": 32,
+      "fps": 8,
+      "loop_start": 0,
+      "w": 74,
+      "h": 74,
+      "ox": -37,
+      "oy": -73
+    },
+    "listening": {
+      "dir": "listening",
+      "frames": 24,
+      "fps": 10,
+      "loop_start": 14,
+      "w": 78,
+      "h": 78,
+      "ox": -38,
+      "oy": -74
+    },
+    "talking": {
+      "dir": "talking",
+      "frames": 30,
+      "fps": 10,
+      "loop_start": 10,
+      "w": 78,
+      "h": 73,
+      "ox": -37,
+      "oy": -72
+    },
+    "happy": {
+      "dir": "happy",
+      "frames": 21,
+      "fps": 10,
+      "loop_start": 14,
+      "w": 90,
+      "h": 83,
+      "ox": -45,
+      "oy": -82
+    },
+    "thinking": {
+      "dir": "thinking",
+      "frames": 30,
+      "fps": 10,
+      "loop_start": 10,
+      "w": 77,
+      "h": 76,
+      "ox": -37,
+      "oy": -73
+    },
+    "surprised": {
+      "dir": "surprised",
+      "frames": 15,
+      "fps": 10,
+      "loop_start": 14,
+      "w": 76,
+      "h": 86,
+      "ox": -39,
+      "oy": -85
+    },
+    "sleepy": {
+      "dir": "sleepy",
+      "frames": 30,
+      "fps": 3,
+      "loop_start": 5,
+      "w": 77,
+      "h": 75,
+      "ox": -38,
+      "oy": -72
+    }
+  }
+}

@@ -69,7 +69,7 @@ import { FillyCharacter } from "@ohcnetwork/care-filly-character";
 | `dpr`                                | `number \| [min, max]`                                                                   | `[1, 2]`      | Device pixel ratio cap.                                                                                   |
 | `background`                         | `string`                                                                                 | `transparent` | Canvas CSS background.                                                                                    |
 | `className`, `style`                 | —                                                                                        | —             | Applied to the wrapper `div` (inline-block).                                                              |
-| `freezeAt`, `freezeBlink`, `onReady` | —                                                                                        | —             | Deterministic single frame (screenshots/tests).                                                           |
+| `freezeAt`, `freezeBlink`, `freezeFrom`, `onReady` | —                                                                          | —             | Deterministic single frame (screenshots/tests). `freezeFrom` starts the frame's transition in that state. |
 
 Ref handle: `{ blink(): void; setState(s): void; getAnimator(): FillyAnimator }`.
 
@@ -149,6 +149,129 @@ light rig.
 is the idle-posed mesh with PBR materials — usable in Blender, `<model-viewer>`, Spline, etc.
 Animation lives in code, not in the file. Regenerate with `npm run export:glb`.
 
+### GitHub Universe 2025 badge (`badger/`)
+
+Filly also runs on the GitHub Universe 2025 badge (Pimoroni Tufty 2350 with MonaOS,
+[gh.io/badger](https://gh.io/badger)). The badge cannot run three.js, so `npm run export:badger`
+renders the animation from the playground as sprite frames: one 8-bit paletted PNG per frame
+(transparent index 0, the format of the badge's own Mona sprites), grouped in a directory per
+state, plus `manifest.json`. Reaction clips start with the ease-in from idle (`freezeFrom`), then
+a seamless loop.
+
+```
+badger/
+├── filly/
+│   ├── fillylib.py      shared library: palette, Clip (one frame in RAM), Filly (anchor + shadow), text helpers
+│   └── assets/          manifest.json + <state>/NN.png frames (generated, 592 kB)
+├── apps/
+│   ├── filly-mascot/    A listen · B talk · C happy · UP think · DOWN sleep
+│   ├── filly-pulse/     ECG rhythm game
+│   ├── filly-pet/       care companion with saved vitals
+│   ├── flappy-filly/    flappy game with a 5-cell sprite sheet (generated, 2.8 kB)
+│   └── filly-run/       runner game with a 9-cell sprite sheet (generated, 5.5 kB)
+└── tools/simulate.py    headless test harness for the badge25 simulator
+```
+
+Each app has an `__init__.py` and a generated 24×24 `icon.png`. The 3 mascot apps share one copy
+of the frames through `fillylib`. Each game has its own small sprite sheet: one row of square
+cells at a smaller body height (24 px for flappy, 36 px for run), like the badge's own Mona flappy
+sprite. The exporter builds a sheet from the `SHEETS` spec: frames of a state's loop, the held
+frame of a one-shot state, or an extra capture with pose values the animator has no state for
+(the duck of `filly-run`).
+
+**Frame format.** One scale for every state: the idle body is 72 px tall (60 % of the 120 px
+screen). Each state has its own crop box, so the idle body does not shrink to make room for the
+happy bounce. The manifest gives each state `w`, `h` and an offset `ox`, `oy` from the anchor.
+The anchor is the feet point: the bottom centre of the idle body. An app blits a frame at
+`(anchor_x + ox, anchor_y + oy)`, and the feet stay on the same pixel in every state. `extent`
+gives the farthest reach from the anchor over all states (45 px left and right, 85 px up).
+
+**Memory.** The MicroPython heap on the badge is about 240 kB and fragmented (largest free block
+about 48 kB), so no large sprite sheet stays in RAM. `fillylib.Clip` decodes the frame on screen
+from flash (about 20 ms and 8 kB for the largest 90×83 frame), like the MonaOS startup animation.
+The game sheets are small (160×32 px for flappy, 432×48 px for run: about 5 kB and 20 kB decoded),
+so they stay in RAM.
+
+#### filly-mascot
+
+Filly reacts to the buttons: A listen, B talk, C happy, UP think, DOWN sleep or wake. A press
+while Filly sleeps gives a surprise. A reaction returns to idle after 3 s. The speech pill at the
+top left shows what Filly says.
+
+#### filly-pulse
+
+Filly plays an ECG rhythm game. A spike moves along the monitor at the top of the screen. Press A
+when the spike crosses the orange marker. A hit gives 1 point. A hit within 55 ms of the beat gives
+3 points. Each hit adds 1 to the streak, and the streak makes the beat faster (60 to 150 BPM). A
+miss costs 1 life. The round ends after 3 misses. Press B to pause or resume a round. The badge
+saves the best score in the `filly-pulse` state.
+
+#### filly-pet
+
+Filly is a virtual CARE pet with 3 bars: REST, JOY and CARE. The bars go down with time. They also
+go down between sessions, up to a limit of 8 h. Press A to hydrate Filly (CARE goes up). Press B to
+play with Filly (JOY goes up, REST goes down). Press C to start a rest (REST goes up). Any button
+wakes Filly. Press UP or DOWN to show the age and the care count. The badge saves the state in
+`filly-pet` after each action, every 30 s, and on HOME.
+
+#### flappy-filly
+
+Filly flies between the pillars, like the badge's flappy mona. Press C to flap. Filly falls with
+gravity. Each pillar has a gap of 52 px. Filly gets 1 point for each pillar. The pillars move at
+40 px/s at the start and get faster with the score, up to 80 px/s. A hit on a pillar or on the
+floor ends the round: Filly shows the surprised face and falls. Press C on the game-over panel to
+play again. The badge saves the best score in the `flappy-filly` state.
+
+The sprite is a 5-cell sheet: rise, float, sink and fall from the happy bounce, and hit from the
+surprised clip. The game picks a cell from the vertical speed, as the Mona sprite does. Speeds
+are in px/s, so the game feels the same at every frame rate.
+
+#### filly-run
+
+Filly runs through a desert, like the Chrome dinosaur game. Press A or UP to jump. Hold DOWN to
+duck, or to drop faster in the air. Cacti come alone or in groups. Birds come after 300 points at
+3 heights: jump over a low bird, duck under a mid bird, run under a high bird. The score counts the
+distance. The speed goes up from 100 px/s to 190 px/s. Every 500 points the sky changes between
+day and night. A hit freezes the game and shows the surprised face. Press A on the game-over panel
+to play again. The badge saves the best score in the `filly-run` state.
+
+Filly has no legs, so the run cycle is the happy bounce: 7 frames at a 36 px body height. The
+sheet has 2 more cells: hit and duck. The duck is a real pose of the character: the exporter
+captures the idle frame with a squashed body, ears back and a small lean, through the `pose`
+field of `window.__fillyFrame`. Each cell is anchor aligned: the feet point is 1 px above the
+bottom centre of the cell, so the bounce lifts the body in the cell.
+
+**Install on the badge:**
+
+1. Connect the badge over USB-C. Press RESET 2 times. The `BADGER` disk mounts (it is `/system`).
+2. Copy `badger/filly` to `/Volumes/BADGER/filly`. Copy each app directory from `badger/apps/` to
+   `/Volumes/BADGER/apps/`. Remove AppleDouble files: `dot_clean -m /Volumes/BADGER`.
+3. The MonaOS 4.03 menu holds 6 apps in a fixed list. Do one of these:
+   - Copy the newer menu from [badger/home](https://github.com/badger/home/tree/main/badge25/apps/menu)
+     (`badge25/apps/menu/`, 4 files) over `/Volumes/BADGER/apps/menu/`. This menu finds every
+     app in `/system/apps` and shows 6 per page. Back up the old menu directory first.
+   - Or, in `/Volumes/BADGER/apps/menu/__init__.py`, replace entries in the list with
+     `("filly", "filly-mascot")`, `("flappy filly", "flappy-filly")` and so on.
+4. Eject the disk. Press RESET 1 time.
+
+**Debug.** To see an app error, read the badge's USB serial port (`cat /dev/cu.usbmodem*`):
+MicroPython prints the traceback there before the watchdog restarts the badge.
+
+**Test without hardware.** `badger/tools/simulate.py` runs an app in the
+[badge25 simulator](https://github.com/badger/home/tree/main/badge25/simulator) without a
+window. It uses a virtual clock, presses buttons from a script, and saves screenshots and a
+contact sheet. It needs Python 3.13 with pygame and a clone of `badger/home`:
+
+```bash
+BADGER_HOME=/path/to/badger-home python badger/tools/simulate.py filly-mascot \
+  --seconds 12 --keys "a@1,b@4,c@7,up@10" --shots 0.5,2,5,8,11 --out /tmp/sim
+```
+
+The run ends with `OK:` (and the number of frame decodes) or `FAIL:` with the traceback.
+`--seed` makes a game run repeatable. `--dump mode,score` prints module globals at the end.
+`--extra-app DIR` adds an app from outside the repo, for example the menu of `badger/home`, which
+then shows the Filly apps next to the stock apps.
+
 ---
 
 ## How it is put together
@@ -159,9 +282,10 @@ src/
 ├── model/       FillyModel — three.js rig: CSG body + plate, tiles, limbs, eyes, mouth, decorations
 ├── animation/   FillyAnimator — springs + per-state targets/loops, blink, talking, pointer follow
 └── react/       <FillyCharacter> (Canvas, lights, env, frame loop), <FillyMascot>
-playground/      dev page: interactive / ?state=&t= frames / ?sheet=1 / ?export=1
+playground/      dev page: interactive / ?state=&t=[&from=] frames / ?sheet=1 / ?export=1
 scripts/         harness.mts (vite + headless Chromium), snapshot.mts (screenshots),
-                 export-glb.mts (.glb), singlefile.mts (one-file demo page)
+                 export-glb.mts (.glb), export-badger.mts (badge sprite frames), singlefile.mts (one-file demo page)
+badger/          GitHub Universe 2025 badge: shared fillylib + frames, 3 apps, simulator harness
 docs/superpowers/specs/   design spec
 ```
 
@@ -187,15 +311,17 @@ npm run snapshot     # screenshots/*.png + sheet.png (headless Chromium)
 npm run build        # dist/index.js + d.ts
 npm run build:playground # dist-playground/ — static site for Cloudflare Pages
 npm run export:glb   # dist/filly-mascot.glb
+npm run export:badger # badger/filly/assets/ + badger/apps/*/icon.png — sprite frames for the Universe 2025 badge (~10 min)
 npm run build:all    # clean + build + export:glb
 npm run build:demo   # dist-playground/filly-playground.html — the playground as ONE self-contained file
 ```
 
-`snapshot`, `export:glb` and `build:demo` drive headless Chromium through Playwright; on a fresh
+`snapshot`, `export:glb`, `export:badger` and `build:demo` drive headless Chromium through Playwright; on a fresh
 machine run `npx playwright install chromium` once. `prepublishOnly` runs `build:all`, so
 publishing also needs Chromium available.
 
 Playground URLs: `/` interactive · `/?state=happy&t=1.2` deterministic frame ·
+`/?state=happy&t=0.3&from=idle` frame on the idle → happy transition ·
 `/?sheet=1` all states in the reference layout · `/?export=1` GLB export hook.
 
 ## Cloudflare Pages
