@@ -215,10 +215,10 @@ wakes Filly. Press UP or DOWN to show the age and the care count. The badge save
 
 #### flappy-filly
 
-Filly flies between the pillars, like the badge's flappy mona. Press A to flap. Filly falls with
+Filly flies between the pillars, like the badge's flappy mona. Press C to flap. Filly falls with
 gravity. Each pillar has a gap of 52 px. Filly gets 1 point for each pillar. The pillars move at
 40 px/s at the start and get faster with the score, up to 80 px/s. A hit on a pillar or on the
-floor ends the round: Filly shows the surprised face and falls. Press A on the game-over panel to
+floor ends the round: Filly shows the surprised face and falls. Press C on the game-over panel to
 play again. The badge saves the best score in the `flappy-filly` state.
 
 The sprite is a 5-cell sheet: rise, float, sink and fall from the happy bounce, and hit from the

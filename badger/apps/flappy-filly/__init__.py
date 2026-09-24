@@ -174,7 +174,7 @@ def fall(dt):
 
 def update_play(dt, now):
     global score, speed, pillars
-    if io.BUTTON_A in io.pressed:
+    if io.BUTTON_C in io.pressed:
         flap()
     if fall(dt):
         die(now)
@@ -278,7 +278,7 @@ def update():
 
     if mode == MODE_TITLE:
         scroll += SPEED_START * dt
-        if io.BUTTON_A in io.pressed:
+        if io.BUTTON_C in io.pressed:
             start_round(title_y(now))
     elif mode == MODE_PLAY:
         scroll += speed * dt
@@ -288,7 +288,7 @@ def update():
         if now - died_at >= OVER_MS:
             mode = MODE_OVER
     elif mode == MODE_OVER:
-        if io.BUTTON_A in io.pressed:
+        if io.BUTTON_C in io.pressed:
             start_round(HOVER_Y)
 
     draw_sky()
@@ -298,13 +298,13 @@ def update():
     draw_filly(now)
 
     if mode == MODE_TITLE:
-        draw_panel("flappy filly", "best " + str(best), "press A")
-        draw_hint("A flap")
+        draw_panel("flappy filly", "best " + str(best), "press C")
+        draw_hint("C flap")
     elif mode == MODE_PLAY or mode == MODE_DYING:
         draw_hud()
     else:
         draw_panel("new best" if new_best else "game over", "score " + str(score), "best " + str(best))
-        draw_hint("A again")
+        draw_hint("C again")
 
 
 if __name__ == "__main__":
