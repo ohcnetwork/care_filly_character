@@ -6,6 +6,7 @@
  *  - ?export=1          exposes window.__fillyExportGLB() for scripts/export-glb.mts
  */
 import { isFillyState } from "../src/core/types";
+import { ExhibitMode } from "./ExhibitMode";
 import { ExportMode } from "./ExportMode";
 import { FrameMode } from "./FrameMode";
 import { InteractiveMode } from "./InteractiveMode";
@@ -19,6 +20,7 @@ function num(v: string | null, fallback: number): number {
 }
 
 export function App() {
+  if (/^\/exhibit\/?$/.test(window.location.pathname)) return <ExhibitMode />;
   const params = new URLSearchParams(window.location.search);
   if (params.get("social") === "1") return <SocialPreviewMode />;
   if (params.get("export") === "1") return <ExportMode />;

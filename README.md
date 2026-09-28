@@ -5,7 +5,7 @@
 > (or any React app) as a component that idles, blinks, listens, talks, bounces, thinks,
 > gets surprised, falls asleep — and follows the cursor, GitHub-Mona style.
 
-[Playground](https://mascot.ohc.network/) · [All eight expressions](https://mascot.ohc.network/?sheet=1)
+[Playground](https://mascot.ohc.network/) · [All eight expressions](https://mascot.ohc.network/?sheet=1) · [CARE exhibit](https://mascot.ohc.network/exhibit)
 
 <p align="center">
   <img src="screenshots/sheet.png" alt="Filly — rendered animation states" width="900" />
@@ -44,6 +44,51 @@ To use the component from a sibling checkout, run `npm run build` here, then
 
 Peer deps: `react ≥ 18`, `react-dom ≥ 18`, `three ≥ 0.179`, `@react-three/fiber ≥ 9`.
 (`three-bvh-csg` / `three-mesh-bvh`, used for the face-plate recess, are regular dependencies and install automatically.)
+
+## Exhibition mode
+
+Open `/exhibit` for a continuously looping CARE presentation hosted by Filly.
+The seven chapters cover patient workflows, remote and home-based care,
+interoperability, assistive AI, open source, and ways to join OHC.
+
+Selected recordings from the [CARE HMIS deck](https://deck.ohc.network/) are
+interleaved with the narration: clinical records, scheduling, pharmacy, remote
+monitoring, Filly documentation, and doctor summaries. Video cues give the recording
+the main viewing area while Filly stays alongside it. Clips loop silently within
+their cue, follow the presentation's pause/visibility state, and have a minimum
+display duration. A failed or stalled clip is skipped so the exhibit keeps moving.
+
+The presentation starts automatically with captions. Click **Enable voice** once
+to add browser speech synthesis; browsers require interaction before narration.
+Voice availability and pronunciation depend on the device's installed voices.
+No speech API credentials are needed. If speech fails or stalls, captions keep
+the presentation moving. The QR code is generated locally and links to OHC.
+
+Use the playback controls to pause, select chapters, restart, mute, or enter
+fullscreen. Keyboard controls are `Space` (pause/play), arrow keys (chapters),
+`R` (restart), `M` (voice), and `F` (fullscreen), when focus is outside a control.
+Resuming repeats the current sentence. Hidden tabs pause both narration and
+animation, then resume on return. The page requests a screen wake lock where
+supported; configure the exhibition device's power settings as well.
+
+Edit the script and reading-time calculation in
+[playground/exhibitPlayback.ts](playground/exhibitPlayback.ts). Spoken chapters advance when each
+utterance finishes; silent chapters use reading-time estimates. The content is
+grounded in [OHC's public CARE overview](https://ohc.network/) and the
+[CARE HMIS deck](https://deck.ohc.network/), accessed 2026-09-27, and does not embed
+changing deployment or impact counts. The locally bundled videos and posters add
+about 12 MB; source slides and asset provenance are recorded in
+[playground/public/exhibit-media/README.md](playground/public/exhibit-media/README.md).
+Temporary Canva media URLs are not used at runtime.
+
+Run `npm run test:exhibit` for Playwright checks of full loops, narration lifecycle
+(with a simulated speech engine), keyboard and fullscreen controls, responsive
+layouts, nonblank animated canvas pixels, and real muted video playback. Each demo
+also gets desktop/mobile screenshots and pause/resume checks. Screenshots go to the temporary
+`care-filly-exhibit` directory printed by the command. Use
+`npm run test:exhibit -- --url http://127.0.0.1:5179` to check a running production
+preview instead. Check the actual speakers and installed voice on the stall
+device before the event.
 
 ## Use
 
@@ -183,6 +228,7 @@ docs/superpowers/specs/   design spec
 npm install
 npm run dev          # playground on http://127.0.0.1:5178
 npm run check        # typecheck + lint + tests
+npm run test:exhibit # exhibit loops, controls, layouts, and canvas checks
 npm run snapshot     # screenshots/*.png + sheet.png (headless Chromium)
 npm run build        # dist/index.js + d.ts
 npm run build:playground # dist-playground/ — static site for Cloudflare Pages
@@ -196,7 +242,8 @@ machine run `npx playwright install chromium` once. `prepublishOnly` runs `build
 publishing also needs Chromium available.
 
 Playground URLs: `/` interactive · `/?state=happy&t=1.2` deterministic frame ·
-`/?sheet=1` all states in the reference layout · `/?export=1` GLB export hook.
+`/?sheet=1` all states in the reference layout · `/?export=1` GLB export hook ·
+`/exhibit` looping CARE exhibition.
 
 ## Cloudflare Pages
 
@@ -229,6 +276,9 @@ refresh `playground/public/og-filly.jpg` when that artwork changes.
 icons. The same public directory contains `robots.txt`, `sitemap.xml`, and
 `site.webmanifest`. Its standalone `404.html` gives unknown paths a real 404 on
 Cloudflare Pages; the existing query-based playground views still use `/`.
+The explicit rules in [playground/public/_redirects](playground/public/_redirects)
+serve `/exhibit` and `/exhibit/` through the app without turning other missing
+paths into SPA fallbacks. Other static hosts need equivalent rewrites.
 
 ## License
 
